@@ -10,6 +10,28 @@ py -3 translator_app.py
 
 首次运行会在同目录生成 `translator_config.json`，用于保存语言、模型、API KEY、置顶和回翻译设置。
 
+## 发布与验证
+
+当前个人仓库预检 Release：
+
+- Release：https://github.com/ifghjb169-hash/translate/releases/tag/v1.0.0
+- 构建产物：`translate-v1.0.0.zip`
+- 构建方式：GitHub Actions tag push 触发
+- 构建证明：Release 产物已通过 GitHub Attestation API 查询到构建证明
+
+验证方式：
+
+```powershell
+# 下载 Release 产物后计算 SHA256
+Get-FileHash -Algorithm SHA256 .\translate-v1.0.0.zip
+```
+
+当前 `v1.0.0` 产物 SHA256：
+
+```text
+bb4db6c4b3ce3844dd9cddae8b32ce620b597d4b5cffc5d901a576fdae3a0808
+```
+
 ## 已实现功能
 
 - 翻译页分为输入框、译文框和回翻译小框，启动时输入框和译文框等高，三块高度可以拖动分隔条自由调整。
