@@ -12,24 +12,24 @@ py -3 translator_app.py
 
 ## 发布与验证
 
-当前个人仓库预检 Release：
+当前组织仓库 Release：
 
-- Release：https://github.com/ifghjb169-hash/translate/releases/tag/v1.0.0
-- 构建产物：`translate-v1.0.0.zip`
+- Release：https://github.com/secure-artifacts/translate/releases
+- 构建产物：`translate-<version>.zip`
 - 构建方式：GitHub Actions tag push 触发
-- 构建证明：Release 产物已通过 GitHub Attestation API 查询到构建证明
+- 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
 
 验证方式：
 
 ```powershell
 # 下载 Release 产物后计算 SHA256
-Get-FileHash -Algorithm SHA256 .\translate-v1.0.0.zip
+Get-FileHash -Algorithm SHA256 .\translate-<version>.zip
 ```
 
-当前 `v1.0.0` 产物 SHA256：
+也可以使用 GitHub CLI 验证软件来源：
 
-```text
-bb4db6c4b3ce3844dd9cddae8b32ce620b597d4b5cffc5d901a576fdae3a0808
+```bash
+gh attestation verify ./translate-<version>.zip --repo secure-artifacts/translate
 ```
 
 ## 已实现功能
