@@ -1,0 +1,47 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: write
+  attestations: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate Python source
+        run: python -m py_compile translator_app.py
+
+      - name: Package release artifact
+        shell: bash
+        run: |
+          mkdir -p dist/package
+          cp translator_app.py dist/package/
+          cp README.md dist/package/
+          cd dist/package
+          zip -r "../translate-${GITHUB_REF_NAME}.zip" .
+
+      - name: Attest Build Provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/translate-${{ github.ref_name }}.zip'
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/translate-${{ github.ref_name }}.zip
+          generate_release_notes: true
