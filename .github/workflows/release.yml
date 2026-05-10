@@ -48,7 +48,7 @@ jobs:
           subject-path: 'dist/AI-Translate-Assistant-${{ github.ref_name }}-win-x64.zip'
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/AI-Translate-Assistant-${{ github.ref_name }}-win-x64.zip
           generate_release_notes: true
