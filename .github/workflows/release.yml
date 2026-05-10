@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -26,22 +26,29 @@ jobs:
       - name: Validate Python source
         run: python -m py_compile translator_app.py
 
-      - name: Package release artifact
-        shell: bash
+      - name: Install PyInstaller
         run: |
-          mkdir -p dist/package
-          cp translator_app.py dist/package/
-          cp README.md dist/package/
-          cd dist/package
-          zip -r "../translate-${GITHUB_REF_NAME}.zip" .
+          python -m pip install --upgrade pip
+          python -m pip install pyinstaller
+
+      - name: Build Windows executable
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name AI-Translate-Assistant translator_app.py
+
+      - name: Package release artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          Copy-Item "dist\AI-Translate-Assistant.exe" "release\AI-Translate-Assistant.exe"
+          Copy-Item "README.md" "release\README.md"
+          Compress-Archive -Path "release\*" -DestinationPath "dist\AI-Translate-Assistant-${env:GITHUB_REF_NAME}-win-x64.zip" -Force
 
       - name: Attest Build Provenance
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: 'dist/translate-${{ github.ref_name }}.zip'
+          subject-path: 'dist/AI-Translate-Assistant-${{ github.ref_name }}-win-x64.zip'
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/translate-${{ github.ref_name }}.zip
+          files: dist/AI-Translate-Assistant-${{ github.ref_name }}-win-x64.zip
           generate_release_notes: true

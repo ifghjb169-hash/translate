@@ -14,8 +14,9 @@ py -3 translator_app.py
 
 当前组织仓库 Release：
 
-- Release：https://github.com/secure-artifacts/translate/releases
-- 构建产物：`translate-<version>.zip`
+- Release：https://github.com/secure-artifacts/translate/releases/latest
+- 构建产物：`AI-Translate-Assistant-<version>-win-x64.zip`
+- 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
 - 构建方式：GitHub Actions tag push 触发
 - 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
 
@@ -23,13 +24,13 @@ py -3 translator_app.py
 
 ```powershell
 # 下载 Release 产物后计算 SHA256
-Get-FileHash -Algorithm SHA256 .\translate-<version>.zip
+Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-<version>-win-x64.zip
 ```
 
 也可以使用 GitHub CLI 验证软件来源：
 
 ```bash
-gh attestation verify ./translate-<version>.zip --repo secure-artifacts/translate
+gh attestation verify ./AI-Translate-Assistant-<version>-win-x64.zip --repo secure-artifacts/translate
 ```
 
 ## 已实现功能

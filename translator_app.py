@@ -13,7 +13,15 @@ from urllib.error import HTTPError, URLError
 
 
 APP_TITLE = "AI 翻译助手"
-CONFIG_PATH = Path(__file__).with_name("translator_config.json")
+
+
+def app_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+CONFIG_PATH = app_base_dir() / "translator_config.json"
 
 BLUE = "#1a73e8"
 TEXT = "#1f3552"
@@ -875,6 +883,10 @@ class LanguagePicker(ttk.Frame):
     def value(self) -> list[str]:
         return list(self.selected)
 
+    def set_selected(self, selected: list[str]):
+        self.selected = normalize_language_list(selected, self.selected or [LANGUAGES[0][0]])
+        self.refresh()
+
 
 class TranslatorApp(tk.Tk):
     def __init__(self):
@@ -1618,11 +1630,15 @@ class TranslatorApp(tk.Tk):
     def _source_language_changed(self, code: str, language_codes: list[str]):
         self.config_data["source_lang"] = code
         self.config_data["my_languages"] = normalize_language_list(language_codes, self.config_data["my_languages"])
+        if hasattr(self, "my_picker"):
+            self.my_picker.set_selected(self.config_data["my_languages"])
         self._refresh_back_panel()
 
     def _target_language_changed(self, code: str, language_codes: list[str]):
         self.config_data["target_lang"] = code
         self.config_data["their_languages"] = normalize_language_list(language_codes, self.config_data["their_languages"])
+        if hasattr(self, "their_picker"):
+            self.their_picker.set_selected(self.config_data["their_languages"])
 
     def swap_languages(self):
         source = self.config_data.get("source_lang")
