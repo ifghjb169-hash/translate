@@ -43,7 +43,7 @@ jobs:
           Compress-Archive -Path "release\*" -DestinationPath "dist\AI-Translate-Assistant-${env:GITHUB_REF_NAME}-win-x64.zip" -Force
 
       - name: Attest Build Provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'dist/AI-Translate-Assistant-${{ github.ref_name }}-win-x64.zip'
 
