@@ -1,6 +1,8 @@
 import ctypes
+import base64
 import json
 import queue
+import subprocess
 import sys
 import threading
 import tkinter as tk
@@ -23,6 +25,34 @@ def app_base_dir() -> Path:
 
 CONFIG_PATH = app_base_dir() / "translator_config.json"
 
+SPEECH_CULTURES = {
+    "zh-CN": "zh-CN",
+    "zh-TW": "zh-TW",
+    "en": "en-US",
+    "ja": "ja-JP",
+    "ko": "ko-KR",
+    "fr": "fr-FR",
+    "de": "de-DE",
+    "es": "es-ES",
+    "it": "it-IT",
+    "pt": "pt-BR",
+    "ru": "ru-RU",
+    "ar": "ar-SA",
+    "hi": "hi-IN",
+    "ne": "ne-NP",
+    "my": "my-MM",
+    "th": "th-TH",
+    "vi": "vi-VN",
+    "id": "id-ID",
+    "nl": "nl-NL",
+    "pl": "pl-PL",
+    "tr": "tr-TR",
+    "sv": "sv-SE",
+    "uk": "uk-UA",
+    "el": "el-GR",
+    "he": "he-IL",
+}
+
 BLUE = "#1a73e8"
 TEXT = "#1f3552"
 MUTED = "#7a8799"
@@ -31,6 +61,7 @@ BG = "#f5f8fc"
 PANEL = "#ffffff"
 
 IS_WINDOWS = sys.platform.startswith("win")
+CREATE_NO_WINDOW = 0x08000000 if IS_WINDOWS else 0
 if IS_WINDOWS:
     USER32 = ctypes.WinDLL("user32", use_last_error=True)
     KERNEL32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -109,6 +140,9 @@ UI_TEXT = {
         "translate": "翻译",
         "copy_output": "复制译文",
         "clear": "清空",
+        "listen_input": "麦克风",
+        "speak_input": "朗读输入",
+        "speak_output": "朗读译文",
         "back_translation": "回翻译",
         "back_to": "回翻译为：{source}",
         "always_on_top": "软件界面永远置顶",
@@ -141,8 +175,13 @@ UI_TEXT = {
         "input_required": "请输入需要翻译的文字",
         "same_language": "上下语言相同，请先切换其中一个语言",
         "translating": "正在翻译...",
+        "listening": "正在听写，请对着默认麦克风说话...",
+        "speaking": "正在使用默认扬声器朗读...",
         "done": "完成：{provider}",
         "failed": "翻译失败",
+        "speech_failed": "语音功能失败",
+        "speech_done": "语音输入完成",
+        "speech_no_text": "没有可朗读的文字",
         "copied": "译文已复制",
         "pasted_external": "译文已输入到外部窗口",
         "paste_target_missing": "没有找到外部输入窗口，已复制译文",
@@ -161,6 +200,9 @@ UI_TEXT = {
         "translate": "Translate",
         "copy_output": "Copy",
         "clear": "Clear",
+        "listen_input": "Mic",
+        "speak_input": "Speak Input",
+        "speak_output": "Speak Translation",
         "back_translation": "Back Translation",
         "back_to": "Back to: {source}",
         "always_on_top": "Always keep window on top",
@@ -193,8 +235,13 @@ UI_TEXT = {
         "input_required": "Enter text to translate",
         "same_language": "Source and target languages are the same.",
         "translating": "Translating...",
+        "listening": "Listening through the default microphone...",
+        "speaking": "Speaking through the default speaker...",
         "done": "Done: {provider}",
         "failed": "Translation failed",
+        "speech_failed": "Speech failed",
+        "speech_done": "Speech input complete",
+        "speech_no_text": "No text to speak",
         "copied": "Translation copied",
         "pasted_external": "Translation pasted into the external window",
         "paste_target_missing": "No external input window found; translation copied",
@@ -607,6 +654,101 @@ def read_http_json(url: str, payload: dict | None = None, headers: dict | None =
     return json.loads(body)
 
 
+def speech_culture(language_code: str) -> str:
+    return SPEECH_CULTURES.get(language_code, language_code)
+
+
+def _powershell_base64(value: str) -> str:
+    return base64.b64encode(value.encode("utf-8")).decode("ascii")
+
+
+def run_powershell_script(script: str, timeout: int = 30) -> str:
+    if not IS_WINDOWS:
+        raise RuntimeError("当前语音功能仅支持 Windows。")
+
+    encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    completed = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-STA",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-EncodedCommand",
+            encoded,
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+        creationflags=CREATE_NO_WINDOW,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()
+        raise RuntimeError(detail or "Windows 语音服务执行失败。")
+    return completed.stdout.strip()
+
+
+def recognize_speech(language_code: str, seconds: int = 8) -> str:
+    culture_b64 = _powershell_base64(speech_culture(language_code))
+    script = f"""
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Add-Type -AssemblyName System.Speech
+$cultureName = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{culture_b64}'))
+$culture = [System.Globalization.CultureInfo]::GetCultureInfo($cultureName)
+$recognizer = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers() |
+    Where-Object {{ $_.Culture.Name -eq $culture.Name -or $_.Culture.TwoLetterISOLanguageName -eq $culture.TwoLetterISOLanguageName }} |
+    Select-Object -First 1
+if ($null -eq $recognizer) {{
+    throw "没有安装 $cultureName 的 Windows 语音识别包。请在系统语言设置里添加该语言的语音识别。"
+}}
+$engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine $recognizer
+try {{
+    $engine.SetInputToDefaultAudioDevice()
+    $grammar = New-Object System.Speech.Recognition.DictationGrammar
+    $engine.LoadGrammar($grammar)
+    $result = $engine.Recognize([TimeSpan]::FromSeconds({int(seconds)}))
+    if ($null -eq $result -or [string]::IsNullOrWhiteSpace($result.Text)) {{
+        throw "没有识别到语音。"
+    }}
+    Write-Output $result.Text
+}} finally {{
+    $engine.Dispose()
+}}
+"""
+    return run_powershell_script(script, timeout=seconds + 8).strip()
+
+
+def speak_text(text: str, language_code: str) -> None:
+    text_b64 = _powershell_base64(text)
+    culture_b64 = _powershell_base64(speech_culture(language_code))
+    script = f"""
+Add-Type -AssemblyName System.Speech
+$text = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{text_b64}'))
+$cultureName = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{culture_b64}'))
+$culture = [System.Globalization.CultureInfo]::GetCultureInfo($cultureName)
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+try {{
+    $synth.SetOutputToDefaultAudioDevice()
+    $voice = $synth.GetInstalledVoices() |
+        Where-Object {{
+            $_.Enabled -and ($_.VoiceInfo.Culture.Name -eq $culture.Name -or $_.VoiceInfo.Culture.TwoLetterISOLanguageName -eq $culture.TwoLetterISOLanguageName)
+        }} |
+        Select-Object -First 1
+    if ($null -ne $voice) {{
+        $synth.SelectVoice($voice.VoiceInfo.Name)
+    }}
+    $synth.Volume = 100
+    $synth.Rate = 0
+    $synth.Speak($text)
+}} finally {{
+    $synth.Dispose()
+}}
+"""
+    run_powershell_script(script, timeout=max(20, min(120, len(text) // 8 + 20)))
+
+
 def google_translate(text: str, source_lang: str, target_lang: str) -> str:
     params = parse.urlencode(
         {
@@ -894,6 +1036,8 @@ class TranslatorApp(tk.Tk):
         self.config_data = load_config()
         self.result_queue: queue.Queue[tuple[str, TranslationResult | Exception]] = queue.Queue()
         self.translation_running = False
+        self.speech_running = False
+        self.speaking_running = False
         self.ui_scale = 1.0
         self.last_external_hwnd = None
         self.pending_translation_source = ""
@@ -1071,6 +1215,12 @@ class TranslatorApp(tk.Tk):
         self.input_text.bind("<Return>", self._submit_from_keyboard)
         self.input_text.bind("<Control-Return>", self._submit_from_keyboard)
         self.input_text.bind("<Shift-Return>", self._insert_newline)
+        source_audio = ttk.Frame(self.source_panel, style="Panel.TFrame")
+        source_audio.grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 6))
+        self.listen_button = ttk.Button(source_audio, text=f"🎙 {self._ui('listen_input')}", command=self.start_speech_input)
+        self.listen_button.grid(row=0, column=0, sticky="w")
+        self.speak_input_button = ttk.Button(source_audio, text=f"🔊 {self._ui('speak_input')}", command=self.speak_input_text)
+        self.speak_input_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
         self.translate_panes.add(self.source_panel, minsize=80)
 
         self.target_panel = self._panel(self.translate_panes)
@@ -1090,6 +1240,10 @@ class TranslatorApp(tk.Tk):
             state="disabled",
         )
         self.output_text.grid(row=1, column=0, sticky="nsew")
+        target_audio = ttk.Frame(self.target_panel, style="Panel.TFrame")
+        target_audio.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 6))
+        self.speak_output_button = ttk.Button(target_audio, text=f"🔊 {self._ui('speak_output')}", command=self.speak_output_text)
+        self.speak_output_button.grid(row=0, column=0, sticky="w")
         self.translate_panes.add(self.target_panel, minsize=80)
 
         self.back_panel = self._panel(self.translate_panes)
@@ -1756,6 +1910,73 @@ class TranslatorApp(tk.Tk):
         self.clipboard_clear()
         self.clipboard_append(output)
         self.status_var.set(self._ui("copied"))
+
+    def start_speech_input(self):
+        if self.speech_running:
+            return
+        self._sync_settings_from_widgets(validate=False)
+        source_lang = self.config_data.get("source_lang", "en")
+        self.speech_running = True
+        self.listen_button.configure(state="disabled")
+        self.status_var.set(self._ui("listening"))
+        threading.Thread(target=self._speech_input_worker, args=(source_lang,), daemon=True).start()
+
+    def _speech_input_worker(self, source_lang: str):
+        try:
+            text = recognize_speech(source_lang)
+            self.after(0, self._speech_input_finished, text, None)
+        except Exception as exc:
+            self.after(0, self._speech_input_finished, "", exc)
+
+    def _speech_input_finished(self, text: str, error: Exception | None):
+        self.speech_running = False
+        self.listen_button.configure(state="normal")
+        if error is not None:
+            self.status_var.set(self._ui("speech_failed"))
+            messagebox.showerror(self._ui("speech_failed"), str(error))
+            return
+
+        current = self.input_text.get("1.0", "end-1c")
+        if current and not current.endswith((" ", "\n")):
+            self.input_text.insert("insert", " ")
+        self.input_text.insert("insert", text)
+        self.status_var.set(self._ui("speech_done"))
+
+    def speak_input_text(self):
+        self._start_speaking(self.input_text.get("1.0", "end").strip(), self.config_data.get("source_lang", "en"))
+
+    def speak_output_text(self):
+        self._start_speaking(self._get_text(self.output_text), self.config_data.get("target_lang", "zh-CN"))
+
+    def _start_speaking(self, text: str, language_code: str):
+        if self.speaking_running:
+            return
+        if not text:
+            self.status_var.set(self._ui("speech_no_text"))
+            return
+
+        self.speaking_running = True
+        self.speak_input_button.configure(state="disabled")
+        self.speak_output_button.configure(state="disabled")
+        self.status_var.set(self._ui("speaking"))
+        threading.Thread(target=self._speak_worker, args=(text, language_code), daemon=True).start()
+
+    def _speak_worker(self, text: str, language_code: str):
+        try:
+            speak_text(text, language_code)
+            self.after(0, self._speak_finished, None)
+        except Exception as exc:
+            self.after(0, self._speak_finished, exc)
+
+    def _speak_finished(self, error: Exception | None):
+        self.speaking_running = False
+        self.speak_input_button.configure(state="normal")
+        self.speak_output_button.configure(state="normal")
+        if error is not None:
+            self.status_var.set(self._ui("speech_failed"))
+            messagebox.showerror(self._ui("speech_failed"), str(error))
+        else:
+            self.status_var.set(self._ui("ready"))
 
     def paste_output_to_external(self):
         output = self._get_text(self.output_text)
