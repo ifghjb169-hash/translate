@@ -12,29 +12,27 @@ py -3 translator_app.py
 
 ## 发布与验证
 
-当前发布版本：`v1.0.5`
+当前发布版本：`v1.0.6`
 
-- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v1.0.5
-- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v1.0.5
-- 构建产物：`AI-Translate-Assistant-v1.0.5-win-x64.zip`
+- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v1.0.6
+- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v1.0.6
+- 构建产物：`AI-Translate-Assistant-v1.0.6-win-x64.zip`
 - 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
 - 构建方式：GitHub Actions tag push 触发
 - 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
-- 组织仓库 SHA256：`276b54f457feb1e2b9353b18f9918f2c26ce4f8c90db2a08311da2de75c12664`
-- 个人仓库 SHA256：`7d658b12b4ce137d10083119d0086d48876fe0e4c1b5ebd0c780cf227bf85e2c`
 
 验证方式：
 
 ```powershell
 # 下载 Release 产物后计算 SHA256
-Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v1.0.5-win-x64.zip
+Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v1.0.6-win-x64.zip
 ```
 
 也可以使用 GitHub CLI 验证软件来源：
 
 ```bash
-gh attestation verify ./AI-Translate-Assistant-v1.0.5-win-x64.zip --repo secure-artifacts/translate
-gh attestation verify ./AI-Translate-Assistant-v1.0.5-win-x64.zip --repo ifghjb169-hash/translate
+gh attestation verify ./AI-Translate-Assistant-v1.0.6-win-x64.zip --repo secure-artifacts/translate
+gh attestation verify ./AI-Translate-Assistant-v1.0.6-win-x64.zip --repo ifghjb169-hash/translate
 ```
 
 ## 已实现功能
@@ -44,7 +42,7 @@ gh attestation verify ./AI-Translate-Assistant-v1.0.5-win-x64.zip --repo ifghjb1
 - 输入框支持默认麦克风语音输入，并可通过默认扬声器朗读输入内容。
 - 译文框支持通过默认扬声器朗读翻译后的内容。
 - “交换语言”按钮位于输入框右上角，会对调上下语言；如果已有译文，也会把译文放回输入框方便继续翻译。
-- 顶部使用等尺寸导航按钮：翻译、设置、文字大小。
+- 顶部使用等尺寸导航按钮：翻译、设置、文字大小、界面语言。
 - 设置页支持窗口永远置顶。
 - 支持选择 `AI 翻译` 或 `Google 翻译`；Google 模式只使用 Google 翻译。
 - AI 模式支持 Gemini 和 Groq AI；选择 Gemini 时只显示并使用 Gemini API KEY，选择 Groq 时只显示并使用 Groq API KEY。

@@ -2,12 +2,14 @@ import ctypes
 import base64
 import json
 import queue
+import re
 import subprocess
 import sys
 import threading
 import tkinter as tk
 import tkinter.font as tkfont
 from dataclasses import dataclass
+from html import unescape
 from pathlib import Path
 from tkinter import messagebox, ttk
 from urllib import parse, request
@@ -123,7 +125,23 @@ UI_LANGUAGES = [
     ("fr", "Français"),
     ("de", "Deutsch"),
     ("es", "Español"),
+    ("it", "Italiano"),
+    ("pt", "Português"),
     ("ru", "Русский"),
+    ("ar", "العربية"),
+    ("hi", "हिन्दी"),
+    ("ne", "नेपाली"),
+    ("my", "မြန်မာ"),
+    ("th", "ไทย"),
+    ("vi", "Tiếng Việt"),
+    ("id", "Bahasa Indonesia"),
+    ("nl", "Nederlands"),
+    ("pl", "Polski"),
+    ("tr", "Türkçe"),
+    ("sv", "Svenska"),
+    ("uk", "Українська"),
+    ("el", "Ελληνικά"),
+    ("he", "עברית"),
 ]
 UI_LANGUAGE_NAMES = dict(UI_LANGUAGES)
 UI_LANGUAGE_CODES = {name: code for code, name in UI_LANGUAGES}
@@ -136,6 +154,7 @@ UI_TEXT = {
         "translate_tab": "翻译",
         "settings_tab": "设置",
         "font_tab": "文字大小",
+        "display_tab": "界面语言",
         "swap_languages": "⇅ 交换语言",
         "translate": "翻译",
         "copy_output": "复制译文",
@@ -166,6 +185,8 @@ UI_TEXT = {
         "back_no": "否，不进行回翻译",
         "save_settings": "保存设置",
         "text_size_title": "翻译框文字大小",
+        "interface_language_title": "软件界面显示语言",
+        "interface_language_hint": "选择软件菜单、按钮和提示使用的语言。保存后重启软件会完整生效。",
         "input_font_size": "输入文字大小",
         "output_font_size": "译文文字大小",
         "back_font_size": "回翻译文字大小",
@@ -196,6 +217,7 @@ UI_TEXT = {
         "translate_tab": "Translate",
         "settings_tab": "Settings",
         "font_tab": "Text Size",
+        "display_tab": "Interface",
         "swap_languages": "⇅ Swap Languages",
         "translate": "Translate",
         "copy_output": "Copy",
@@ -226,6 +248,8 @@ UI_TEXT = {
         "back_no": "No, do not back-translate",
         "save_settings": "Save Settings",
         "text_size_title": "Translation Box Text Size",
+        "interface_language_title": "Interface Language",
+        "interface_language_hint": "Choose the language used by menus, buttons, and messages. Restart the app for the full interface to refresh.",
         "input_font_size": "Input text size",
         "output_font_size": "Translation text size",
         "back_font_size": "Back-translation text size",
@@ -256,6 +280,7 @@ UI_TEXT = {
         "translate_tab": "翻訳",
         "settings_tab": "設定",
         "font_tab": "文字サイズ",
+        "display_tab": "表示言語",
         "swap_languages": "⇅ 言語を交換",
         "translate": "翻訳",
         "copy_output": "翻訳をコピー",
@@ -283,6 +308,8 @@ UI_TEXT = {
         "back_no": "いいえ、逆翻訳しない",
         "save_settings": "設定を保存",
         "text_size_title": "翻訳欄の文字サイズ",
+        "interface_language_title": "画面表示言語",
+        "interface_language_hint": "メニュー、ボタン、メッセージの表示言語を選びます。完全な反映には再起動してください。",
         "input_font_size": "入力文字サイズ",
         "output_font_size": "翻訳文字サイズ",
         "back_font_size": "逆翻訳文字サイズ",
@@ -310,12 +337,15 @@ UI_TEXT["zh-TW"] = {
     "ready": "準備就緒",
     "settings_tab": "設定",
     "font_tab": "文字大小",
+    "display_tab": "介面語言",
     "swap_languages": "⇅ 交換語言",
     "copy_output": "複製譯文",
     "back_translation": "回翻譯",
     "back_to": "回翻譯為：{source}",
     "always_on_top": "軟體介面永遠置頂",
     "ui_language": "軟體介面顯示語言",
+    "interface_language_title": "軟體介面顯示語言",
+    "interface_language_hint": "選擇軟體選單、按鈕和提示使用的語言。儲存後重新啟動會完整生效。",
     "translation_method": "翻譯方式",
     "google_translate": "Google 翻譯",
     "country": "國家特色",
@@ -347,6 +377,7 @@ UI_TEXT["ko"] = {
     "translate_tab": "번역",
     "settings_tab": "설정",
     "font_tab": "글자 크기",
+    "display_tab": "인터페이스",
     "swap_languages": "⇅ 언어 교환",
     "translate": "번역",
     "copy_output": "번역 복사",
@@ -355,6 +386,8 @@ UI_TEXT["ko"] = {
     "back_to": "역번역 대상: {source}",
     "always_on_top": "창을 항상 위에 표시",
     "ui_language": "인터페이스 언어",
+    "interface_language_title": "인터페이스 언어",
+    "interface_language_hint": "메뉴, 버튼, 메시지에 사용할 언어를 선택하세요. 전체 적용은 앱 재시작 후 반영됩니다.",
     "translation_method": "번역 방식",
     "ai_translate": "AI 번역",
     "google_translate": "Google 번역",
@@ -386,6 +419,7 @@ UI_TEXT["fr"] = {
     "translate_tab": "Traduire",
     "settings_tab": "Réglages",
     "font_tab": "Taille du texte",
+    "display_tab": "Interface",
     "swap_languages": "⇅ Échanger les langues",
     "translate": "Traduire",
     "copy_output": "Copier",
@@ -394,6 +428,8 @@ UI_TEXT["fr"] = {
     "back_to": "Retour vers : {source}",
     "always_on_top": "Toujours au premier plan",
     "ui_language": "Langue de l’interface",
+    "interface_language_title": "Langue de l’interface",
+    "interface_language_hint": "Choisissez la langue des menus, boutons et messages. Redémarrez l’application pour l’appliquer entièrement.",
     "translation_method": "Mode de traduction",
     "ai_translate": "Traduction IA",
     "google_translate": "Google Traduction",
@@ -425,6 +461,7 @@ UI_TEXT["de"] = {
     "translate_tab": "Übersetzen",
     "settings_tab": "Einstellungen",
     "font_tab": "Textgröße",
+    "display_tab": "Oberfläche",
     "swap_languages": "⇅ Sprachen tauschen",
     "translate": "Übersetzen",
     "copy_output": "Kopieren",
@@ -433,6 +470,8 @@ UI_TEXT["de"] = {
     "back_to": "Zurück nach: {source}",
     "always_on_top": "Fenster immer im Vordergrund",
     "ui_language": "Sprache der Oberfläche",
+    "interface_language_title": "Sprache der Oberfläche",
+    "interface_language_hint": "Wählen Sie die Sprache für Menüs, Schaltflächen und Meldungen. Starten Sie die App neu, damit alles übernommen wird.",
     "translation_method": "Übersetzungsmethode",
     "ai_translate": "KI-Übersetzung",
     "google_translate": "Google Übersetzer",
@@ -459,6 +498,7 @@ UI_TEXT["es"] = {
     "translate_tab": "Traducir",
     "settings_tab": "Ajustes",
     "font_tab": "Tamaño de texto",
+    "display_tab": "Interfaz",
     "swap_languages": "⇅ Intercambiar idiomas",
     "translate": "Traducir",
     "copy_output": "Copiar",
@@ -467,6 +507,8 @@ UI_TEXT["es"] = {
     "back_to": "Retraducir a: {source}",
     "always_on_top": "Mantener ventana siempre arriba",
     "ui_language": "Idioma de la interfaz",
+    "interface_language_title": "Idioma de la interfaz",
+    "interface_language_hint": "Elige el idioma de menús, botones y mensajes. Reinicia la aplicación para aplicarlo por completo.",
     "translation_method": "Método de traducción",
     "ai_translate": "Traducción IA",
     "google_translate": "Google Traductor",
@@ -493,6 +535,7 @@ UI_TEXT["ru"] = {
     "translate_tab": "Перевод",
     "settings_tab": "Настройки",
     "font_tab": "Размер текста",
+    "display_tab": "Интерфейс",
     "swap_languages": "⇅ Поменять языки",
     "translate": "Перевести",
     "copy_output": "Копировать",
@@ -501,6 +544,8 @@ UI_TEXT["ru"] = {
     "back_to": "Обратно на: {source}",
     "always_on_top": "Окно всегда поверх остальных",
     "ui_language": "Язык интерфейса",
+    "interface_language_title": "Язык интерфейса",
+    "interface_language_hint": "Выберите язык меню, кнопок и сообщений. Перезапустите приложение для полного применения.",
     "translation_method": "Способ перевода",
     "ai_translate": "AI перевод",
     "google_translate": "Google перевод",
@@ -519,6 +564,252 @@ UI_TEXT["ru"] = {
     "copied": "Перевод скопирован",
     "cleared": "Очищено",
 }
+
+EXTRA_UI_TEXT = {
+    "it": {
+        "app_title": "Assistente traduttore AI",
+        "ready": "Pronto",
+        "translate_tab": "Traduci",
+        "settings_tab": "Impostazioni",
+        "font_tab": "Dimensione testo",
+        "display_tab": "Interfaccia",
+        "translate": "Traduci",
+        "copy_output": "Copia",
+        "clear": "Cancella",
+        "ui_language": "Lingua interfaccia",
+        "interface_language_title": "Lingua interfaccia",
+        "interface_language_hint": "Scegli la lingua di menu, pulsanti e messaggi. Riavvia per applicarla completamente.",
+        "save_settings": "Salva",
+    },
+    "pt": {
+        "app_title": "Assistente de tradução AI",
+        "ready": "Pronto",
+        "translate_tab": "Traduzir",
+        "settings_tab": "Definições",
+        "font_tab": "Tamanho do texto",
+        "display_tab": "Interface",
+        "translate": "Traduzir",
+        "copy_output": "Copiar",
+        "clear": "Limpar",
+        "ui_language": "Idioma da interface",
+        "interface_language_title": "Idioma da interface",
+        "interface_language_hint": "Escolha o idioma de menus, botões e mensagens. Reinicie para aplicar tudo.",
+        "save_settings": "Guardar",
+    },
+    "ar": {
+        "app_title": "مساعد الترجمة بالذكاء الاصطناعي",
+        "ready": "جاهز",
+        "translate_tab": "ترجمة",
+        "settings_tab": "الإعدادات",
+        "font_tab": "حجم النص",
+        "display_tab": "الواجهة",
+        "translate": "ترجمة",
+        "copy_output": "نسخ",
+        "clear": "مسح",
+        "ui_language": "لغة الواجهة",
+        "interface_language_title": "لغة الواجهة",
+        "interface_language_hint": "اختر لغة القوائم والأزرار والرسائل. أعد تشغيل التطبيق للتطبيق الكامل.",
+        "save_settings": "حفظ",
+    },
+    "hi": {
+        "app_title": "AI अनुवाद सहायक",
+        "ready": "तैयार",
+        "translate_tab": "अनुवाद",
+        "settings_tab": "सेटिंग",
+        "font_tab": "टेक्स्ट आकार",
+        "display_tab": "इंटरफेस",
+        "translate": "अनुवाद",
+        "copy_output": "कॉपी",
+        "clear": "साफ करें",
+        "ui_language": "इंटरफेस भाषा",
+        "interface_language_title": "इंटरफेस भाषा",
+        "interface_language_hint": "मेनू, बटन और संदेशों की भाषा चुनें। पूरा बदलाव देखने के लिए ऐप फिर खोलें।",
+        "save_settings": "सहेजें",
+    },
+    "ne": {
+        "app_title": "AI अनुवाद सहायक",
+        "ready": "तयार",
+        "translate_tab": "अनुवाद",
+        "settings_tab": "सेटिङ",
+        "font_tab": "पाठ आकार",
+        "display_tab": "इन्टरफेस",
+        "translate": "अनुवाद",
+        "copy_output": "प्रतिलिपि",
+        "clear": "खाली",
+        "ui_language": "इन्टरफेस भाषा",
+        "interface_language_title": "इन्टरफेस भाषा",
+        "interface_language_hint": "मेनु, बटन र सन्देशको भाषा छान्नुहोस्। पूर्ण लागू गर्न एप पुनः खोल्नुहोस्।",
+        "save_settings": "सुरक्षित",
+    },
+    "my": {
+        "app_title": "AI ဘာသာပြန် ကူညီသူ",
+        "ready": "အသင့်",
+        "translate_tab": "ဘာသာပြန်",
+        "settings_tab": "ဆက်တင်",
+        "font_tab": "စာလုံးအရွယ်",
+        "display_tab": "မျက်နှာပြင်",
+        "translate": "ဘာသာပြန်",
+        "copy_output": "ကူးယူ",
+        "clear": "ရှင်း",
+        "ui_language": "မျက်နှာပြင်ဘာသာ",
+        "interface_language_title": "မျက်နှာပြင်ဘာသာစကား",
+        "interface_language_hint": "မီနူး၊ ခလုတ်နှင့် စာသားများအတွက် ဘာသာစကားကို ရွေးပါ။ အပြည့်အစုံပြောင်းရန် ပြန်ဖွင့်ပါ။",
+        "save_settings": "သိမ်း",
+    },
+    "th": {
+        "app_title": "ผู้ช่วยแปล AI",
+        "ready": "พร้อม",
+        "translate_tab": "แปล",
+        "settings_tab": "ตั้งค่า",
+        "font_tab": "ขนาดตัวอักษร",
+        "display_tab": "ภาษา UI",
+        "translate": "แปล",
+        "copy_output": "คัดลอก",
+        "clear": "ล้าง",
+        "ui_language": "ภาษาอินเทอร์เฟซ",
+        "interface_language_title": "ภาษาอินเทอร์เฟซ",
+        "interface_language_hint": "เลือกภาษาของเมนู ปุ่ม และข้อความ รีสตาร์ทเพื่อให้มีผลครบถ้วน",
+        "save_settings": "บันทึก",
+    },
+    "vi": {
+        "app_title": "Trợ lý dịch AI",
+        "ready": "Sẵn sàng",
+        "translate_tab": "Dịch",
+        "settings_tab": "Cài đặt",
+        "font_tab": "Cỡ chữ",
+        "display_tab": "Giao diện",
+        "translate": "Dịch",
+        "copy_output": "Sao chép",
+        "clear": "Xóa",
+        "ui_language": "Ngôn ngữ giao diện",
+        "interface_language_title": "Ngôn ngữ giao diện",
+        "interface_language_hint": "Chọn ngôn ngữ menu, nút và thông báo. Khởi động lại để áp dụng đầy đủ.",
+        "save_settings": "Lưu",
+    },
+    "id": {
+        "app_title": "Asisten Terjemahan AI",
+        "ready": "Siap",
+        "translate_tab": "Terjemah",
+        "settings_tab": "Pengaturan",
+        "font_tab": "Ukuran teks",
+        "display_tab": "Antarmuka",
+        "translate": "Terjemah",
+        "copy_output": "Salin",
+        "clear": "Hapus",
+        "ui_language": "Bahasa antarmuka",
+        "interface_language_title": "Bahasa antarmuka",
+        "interface_language_hint": "Pilih bahasa menu, tombol, dan pesan. Mulai ulang agar seluruh tampilan berubah.",
+        "save_settings": "Simpan",
+    },
+    "nl": {
+        "app_title": "AI vertaalassistent",
+        "ready": "Gereed",
+        "translate_tab": "Vertalen",
+        "settings_tab": "Instellingen",
+        "font_tab": "Tekstgrootte",
+        "display_tab": "Interface",
+        "translate": "Vertalen",
+        "copy_output": "Kopiëren",
+        "clear": "Wissen",
+        "ui_language": "Interfacetaal",
+        "interface_language_title": "Interfacetaal",
+        "interface_language_hint": "Kies de taal voor menu's, knoppen en meldingen. Herstart voor volledige toepassing.",
+        "save_settings": "Opslaan",
+    },
+    "pl": {
+        "app_title": "Asystent tłumaczenia AI",
+        "ready": "Gotowe",
+        "translate_tab": "Tłumacz",
+        "settings_tab": "Ustawienia",
+        "font_tab": "Rozmiar tekstu",
+        "display_tab": "Interfejs",
+        "translate": "Tłumacz",
+        "copy_output": "Kopiuj",
+        "clear": "Wyczyść",
+        "ui_language": "Język interfejsu",
+        "interface_language_title": "Język interfejsu",
+        "interface_language_hint": "Wybierz język menu, przycisków i komunikatów. Uruchom ponownie, aby zastosować w pełni.",
+        "save_settings": "Zapisz",
+    },
+    "tr": {
+        "app_title": "AI Çeviri Asistanı",
+        "ready": "Hazır",
+        "translate_tab": "Çevir",
+        "settings_tab": "Ayarlar",
+        "font_tab": "Metin boyutu",
+        "display_tab": "Arayüz",
+        "translate": "Çevir",
+        "copy_output": "Kopyala",
+        "clear": "Temizle",
+        "ui_language": "Arayüz dili",
+        "interface_language_title": "Arayüz dili",
+        "interface_language_hint": "Menü, düğme ve iletilerin dilini seçin. Tam uygulama için yeniden başlatın.",
+        "save_settings": "Kaydet",
+    },
+    "sv": {
+        "app_title": "AI-översättningsassistent",
+        "ready": "Redo",
+        "translate_tab": "Översätt",
+        "settings_tab": "Inställningar",
+        "font_tab": "Textstorlek",
+        "display_tab": "Gränssnitt",
+        "translate": "Översätt",
+        "copy_output": "Kopiera",
+        "clear": "Rensa",
+        "ui_language": "Gränssnittsspråk",
+        "interface_language_title": "Gränssnittsspråk",
+        "interface_language_hint": "Välj språk för menyer, knappar och meddelanden. Starta om för full effekt.",
+        "save_settings": "Spara",
+    },
+    "uk": {
+        "app_title": "AI помічник перекладу",
+        "ready": "Готово",
+        "translate_tab": "Переклад",
+        "settings_tab": "Налаштування",
+        "font_tab": "Розмір тексту",
+        "display_tab": "Інтерфейс",
+        "translate": "Перекласти",
+        "copy_output": "Копіювати",
+        "clear": "Очистити",
+        "ui_language": "Мова інтерфейсу",
+        "interface_language_title": "Мова інтерфейсу",
+        "interface_language_hint": "Виберіть мову меню, кнопок і повідомлень. Перезапустіть застосунок для повного оновлення.",
+        "save_settings": "Зберегти",
+    },
+    "el": {
+        "app_title": "Βοηθός μετάφρασης AI",
+        "ready": "Έτοιμο",
+        "translate_tab": "Μετάφραση",
+        "settings_tab": "Ρυθμίσεις",
+        "font_tab": "Μέγεθος κειμένου",
+        "display_tab": "Διεπαφή",
+        "translate": "Μετάφραση",
+        "copy_output": "Αντιγραφή",
+        "clear": "Καθαρισμός",
+        "ui_language": "Γλώσσα διεπαφής",
+        "interface_language_title": "Γλώσσα διεπαφής",
+        "interface_language_hint": "Επιλέξτε γλώσσα για μενού, κουμπιά και μηνύματα. Κάντε επανεκκίνηση για πλήρη εφαρμογή.",
+        "save_settings": "Αποθήκευση",
+    },
+    "he": {
+        "app_title": "עוזר תרגום AI",
+        "ready": "מוכן",
+        "translate_tab": "תרגום",
+        "settings_tab": "הגדרות",
+        "font_tab": "גודל טקסט",
+        "display_tab": "ממשק",
+        "translate": "תרגם",
+        "copy_output": "העתק",
+        "clear": "נקה",
+        "ui_language": "שפת ממשק",
+        "interface_language_title": "שפת ממשק",
+        "interface_language_hint": "בחר שפה לתפריטים, כפתורים והודעות. הפעל מחדש כדי להחיל באופן מלא.",
+        "save_settings": "שמור",
+    },
+}
+
+for code, text in EXTRA_UI_TEXT.items():
+    UI_TEXT[code] = {**UI_TEXT["en"], **text}
 
 GEMINI_MODELS = [
     "gemini-2.0-flash",
@@ -662,15 +953,44 @@ def _powershell_base64(value: str) -> str:
     return base64.b64encode(value.encode("utf-8")).decode("ascii")
 
 
+def clean_powershell_error(detail: str) -> str:
+    detail = detail.strip()
+    if detail.startswith("#< CLIXML"):
+        parts = re.findall(r'<S S="Error">(.*?)</S>', detail, flags=re.DOTALL)
+        detail = "\n".join(parts) if parts else detail
+
+    detail = detail.replace("_x000D__x000A_", "\n").replace("_x000A_", "\n").replace("_x000D_", "\r")
+    detail = re.sub(r"<[^>]+>", " ", detail)
+    detail = unescape(detail)
+    detail = re.sub(r"\s+", " ", detail).strip()
+
+    if "Windows 语音识别包" in detail and "没有安装" in detail:
+        culture_match = re.search(r"没有安装\s+([A-Za-z]{2,3}(?:-[A-Za-z0-9]+)?)\s+的 Windows 语音识别包", detail)
+        culture = culture_match.group(1) if culture_match else "当前语言"
+        return (
+            f"系统没有安装 {culture} 的 Windows 语音识别包。"
+            "请在 Windows 设置 > 时间和语言 > 语言和区域 中为该语言添加“语音识别”，"
+            "或者先切换到已经安装语音识别的输入语言。"
+        )
+    return detail or "Windows 语音服务执行失败。"
+
+
 def run_powershell_script(script: str, timeout: int = 30) -> str:
     if not IS_WINDOWS:
         raise RuntimeError("当前语音功能仅支持 Windows。")
 
+    script = (
+        "$ProgressPreference = 'SilentlyContinue'\n"
+        "$ErrorActionPreference = 'Stop'\n"
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n"
+        + script
+    )
     encoded = base64.b64encode(script.encode("utf-16le")).decode("ascii")
     completed = subprocess.run(
         [
             "powershell.exe",
             "-NoProfile",
+            "-NonInteractive",
             "-STA",
             "-ExecutionPolicy",
             "Bypass",
@@ -686,7 +1006,7 @@ def run_powershell_script(script: str, timeout: int = 30) -> str:
     )
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "").strip()
-        raise RuntimeError(detail or "Windows 语音服务执行失败。")
+        raise RuntimeError(clean_powershell_error(detail))
     return completed.stdout.strip()
 
 
@@ -1118,19 +1438,20 @@ class TranslatorApp(tk.Tk):
 
         self.nav = ttk.Frame(self, style="App.TFrame")
         self.nav.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 4))
-        self.nav.grid_columnconfigure(3, weight=1)
+        self.nav.grid_columnconfigure(4, weight=1)
         self.nav_buttons = {}
         for column, (page_name, text) in enumerate(
             (
                 ("translate", self._ui("translate_tab")),
                 ("settings", self._ui("settings_tab")),
                 ("font", self._ui("font_tab")),
+                ("display", self._ui("display_tab")),
             )
         ):
             button = tk.Button(
                 self.nav,
                 text=text,
-                width=8,
+                width=9,
                 height=1,
                 relief="solid",
                 borderwidth=1,
@@ -1152,12 +1473,14 @@ class TranslatorApp(tk.Tk):
         self.translate_page = ttk.Frame(self.page_host, style="App.TFrame")
         self.settings_page = ttk.Frame(self.page_host, style="App.TFrame")
         self.font_page = ttk.Frame(self.page_host, style="App.TFrame")
-        for page in (self.translate_page, self.settings_page, self.font_page):
+        self.display_page = ttk.Frame(self.page_host, style="App.TFrame")
+        for page in (self.translate_page, self.settings_page, self.font_page, self.display_page):
             page.grid(row=0, column=0, sticky="nsew")
 
         self._build_translate_page()
         self._build_settings_page()
         self._build_font_page()
+        self._build_display_page()
         self.show_page("translate")
 
     def show_page(self, page_name: str):
@@ -1165,6 +1488,7 @@ class TranslatorApp(tk.Tk):
             "translate": self.translate_page,
             "settings": self.settings_page,
             "font": self.font_page,
+            "display": self.display_page,
         }
         pages[page_name].tkraise()
         for name, button in self.nav_buttons.items():
@@ -1426,6 +1750,25 @@ class TranslatorApp(tk.Tk):
 
         actions = ttk.Frame(panel, style="Panel.TFrame")
         actions.grid(row=5, column=0, columnspan=3, sticky="ew", padx=18, pady=(10, 18))
+        actions.grid_columnconfigure(0, weight=1)
+        ttk.Button(actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1)
+
+    def _build_display_page(self):
+        self.display_page.grid_columnconfigure(0, weight=1)
+        panel = self._panel(self.display_page)
+        panel.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        panel.grid_columnconfigure(1, weight=1)
+
+        ttk.Label(panel, text=self._ui("interface_language_title"), style="Section.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=18, pady=(18, 6)
+        )
+        ttk.Label(panel, text=self._ui("interface_language_hint"), style="Muted.TLabel").grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=18, pady=(0, 12)
+        )
+        self._labeled_combo(panel, 2, self._ui("ui_language"), self.ui_language_var, UI_LANGUAGE_LABELS)
+
+        actions = ttk.Frame(panel, style="Panel.TFrame")
+        actions.grid(row=3, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 18))
         actions.grid_columnconfigure(0, weight=1)
         ttk.Button(actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1)
 
