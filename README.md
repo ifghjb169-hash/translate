@@ -12,25 +12,29 @@ py -3 translator_app.py
 
 ## 发布与验证
 
-当前组织仓库 Release：
+当前发布版本：`v1.0.4`
 
-- Release：https://github.com/secure-artifacts/translate/releases/latest
-- 构建产物：`AI-Translate-Assistant-<version>-win-x64.zip`
+- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v1.0.4
+- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v1.0.4
+- 构建产物：`AI-Translate-Assistant-v1.0.4-win-x64.zip`
 - 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
 - 构建方式：GitHub Actions tag push 触发
 - 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
+- 组织仓库 SHA256：`96f4508326517c684d05c98f6367efd648afcf5ad612713f97616cab11f9e728`
+- 个人仓库 SHA256：`1caa1e37ea024c3e3ea3d2733d60a8a5169e8ad618ebf73da865bd7668faf7a2`
 
 验证方式：
 
 ```powershell
 # 下载 Release 产物后计算 SHA256
-Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-<version>-win-x64.zip
+Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v1.0.4-win-x64.zip
 ```
 
 也可以使用 GitHub CLI 验证软件来源：
 
 ```bash
-gh attestation verify ./AI-Translate-Assistant-<version>-win-x64.zip --repo secure-artifacts/translate
+gh attestation verify ./AI-Translate-Assistant-v1.0.4-win-x64.zip --repo secure-artifacts/translate
+gh attestation verify ./AI-Translate-Assistant-v1.0.4-win-x64.zip --repo ifghjb169-hash/translate
 ```
 
 ## 已实现功能
