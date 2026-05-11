@@ -1,6 +1,7 @@
 import ctypes
 import base64
 import json
+import os
 import queue
 import re
 import subprocess
@@ -9,6 +10,7 @@ import threading
 import tkinter as tk
 import tkinter.font as tkfont
 from dataclasses import dataclass
+from ctypes import wintypes
 from html import unescape
 from pathlib import Path
 from tkinter import messagebox, ttk
@@ -17,12 +19,21 @@ from urllib.error import HTTPError, URLError
 
 
 APP_TITLE = "AI 翻译助手"
+APP_ICON = "app_icon.ico"
 
 
 def app_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
+
+
+def resource_path(name: str) -> Path:
+    bundled = Path(getattr(sys, "_MEIPASS", app_base_dir()))
+    candidate = bundled / name
+    if candidate.exists():
+        return candidate
+    return app_base_dir() / name
 
 
 CONFIG_PATH = app_base_dir() / "translator_config.json"
@@ -53,6 +64,7 @@ SPEECH_CULTURES = {
     "uk": "uk-UA",
     "el": "el-GR",
     "he": "he-IL",
+    "tl": "fil-PH",
 }
 
 BLUE = "#1a73e8"
@@ -61,6 +73,21 @@ MUTED = "#7a8799"
 BORDER = "#d7dee8"
 BG = "#f5f8fc"
 PANEL = "#ffffff"
+
+
+class GUITHREADINFO(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("hwndActive", wintypes.HWND),
+        ("hwndFocus", wintypes.HWND),
+        ("hwndCapture", wintypes.HWND),
+        ("hwndMenuOwner", wintypes.HWND),
+        ("hwndMoveSize", wintypes.HWND),
+        ("hwndCaret", wintypes.HWND),
+        ("rcCaret", wintypes.RECT),
+    ]
+
 
 IS_WINDOWS = sys.platform.startswith("win")
 CREATE_NO_WINDOW = 0x08000000 if IS_WINDOWS else 0
@@ -71,8 +98,11 @@ if IS_WINDOWS:
     GA_ROOT = 2
     GW_HWNDNEXT = 2
     VK_CONTROL = 0x11
+    VK_RETURN = 0x0D
     VK_V = 0x56
     KEYEVENTF_KEYUP = 0x0002
+    MOUSEEVENTF_LEFTDOWN = 0x0002
+    MOUSEEVENTF_LEFTUP = 0x0004
 else:
     USER32 = None
     KERNEL32 = None
@@ -80,36 +110,141 @@ else:
     GA_ROOT = 2
     GW_HWNDNEXT = 2
     VK_CONTROL = 0x11
+    VK_RETURN = 0x0D
     VK_V = 0x56
     KEYEVENTF_KEYUP = 0x0002
+    MOUSEEVENTF_LEFTDOWN = 0x0002
+    MOUSEEVENTF_LEFTUP = 0x0004
 
 
 LANGUAGES = [
-    ("zh-CN", "中文（简体）"),
-    ("zh-TW", "中文（繁體）"),
+    ("zh-CN", "简体中文"),
+    ("zh-TW", "繁体中文"),
     ("en", "英语"),
+    ("hi", "印地语"),
+    ("id", "印度尼西亚语"),
+    ("ms", "马来语"),
+    ("it", "意大利语"),
+    ("tl", "菲律宾语"),
+    ("ceb", "宿务语"),
+    ("my", "缅甸语"),
+    ("pt-BR", "葡萄牙语（巴西）"),
+    ("pt-PT", "葡萄牙语（葡萄牙）"),
+    ("pt", "葡萄牙语"),
+    ("es", "西班牙语"),
+    ("vi", "越南语"),
+    ("lo", "老挝语"),
+    ("th", "泰语"),
+    ("hmn", "苗语"),
     ("ja", "日语"),
+    ("zu", "祖鲁语"),
+    ("hu", "匈牙利语"),
+    ("hr", "克罗地亚语"),
+    ("eo", "世界语"),
+    ("ckb", "中库尔德语"),
+    ("uz", "乌兹别克语"),
+    ("hy", "亚美尼亚语"),
+    ("sd", "信德语"),
+    ("is", "冰岛语"),
+    ("chr", "切罗基语"),
+    ("gl", "加利西亚语"),
+    ("ca", "加泰罗尼亚语"),
+    ("kn", "卡纳达语"),
+    ("lb", "卢森堡语"),
+    ("rom", "吉普赛语"),
+    ("kk", "哈萨克语"),
+    ("iu", "因纽特语"),
+    ("tr", "土耳其语"),
+    ("tg", "塔吉克语"),
+    ("see", "塞内卡语"),
+    ("oj", "奥吉布瓦语"),
+    ("osa", "奥塞治语"),
+    ("cy", "威尔士语"),
+    ("dz", "宗卡语"),
+    ("km", "高棉语"),
     ("ko", "韩语"),
+    ("ru", "俄语"),
     ("fr", "法语"),
     ("de", "德语"),
-    ("es", "西班牙语"),
-    ("it", "意大利语"),
-    ("pt", "葡萄牙语"),
-    ("ru", "俄语"),
-    ("ar", "阿拉伯语"),
-    ("hi", "印地语"),
+    ("mn", "蒙古语"),
     ("ne", "尼泊尔语"),
-    ("my", "缅甸语"),
-    ("th", "泰语"),
-    ("vi", "越南语"),
-    ("id", "印尼语"),
+    ("af", "南非荷兰语"),
+    ("ar", "阿拉伯语"),
+    ("ta", "泰米尔语"),
+    ("as", "阿萨姆语"),
+    ("bn", "孟加拉语"),
+    ("eu", "巴斯克语"),
+    ("be", "白俄罗斯语"),
+    ("bg", "保加利亚语"),
+    ("cs", "捷克语"),
+    ("da", "丹麦语"),
     ("nl", "荷兰语"),
-    ("pl", "波兰语"),
-    ("tr", "土耳其语"),
-    ("sv", "瑞典语"),
-    ("uk", "乌克兰语"),
+    ("fi", "芬兰语"),
+    ("ff", "富拉语"),
+    ("su", "巽他语"),
+    ("ku", "库尔德语"),
+    ("yi", "意第绪语"),
+    ("lv", "拉脱维亚语"),
+    ("nn", "挪威尼诺斯克语"),
+    ("ti", "提格利尼亚语"),
+    ("sl", "斯洛文尼亚语"),
+    ("ps", "普什图语"),
+    ("ky", "柯尔克孜语"),
+    ("ka", "格鲁吉亚语"),
+    ("mi", "毛利语"),
+    ("bs", "波斯尼亚语"),
+    ("ht", "海地克里奥尔语"),
+    ("ga", "爱尔兰语"),
+    ("et", "爱沙尼亚语"),
+    ("xh", "科萨语"),
+    ("co", "科西嘉语"),
+    ("lt", "立陶宛语"),
+    ("so", "索马里语"),
+    ("yo", "约鲁巴语"),
+    ("nv", "纳瓦霍语"),
+    ("sn", "绍纳语"),
+    ("ug", "维吾尔语"),
+    ("gd", "苏格兰盖尔语"),
     ("el", "希腊语"),
+    ("gu", "古吉拉特语"),
     ("he", "希伯来语"),
+    ("la", "拉丁语"),
+    ("ml", "马拉雅拉姆语"),
+    ("mni-Mtei", "曼尼普尔语"),
+    ("mr", "马拉地语"),
+    ("no", "挪威语"),
+    ("or", "奥里亚语"),
+    ("fa", "波斯语"),
+    ("pl", "波兰语"),
+    ("pa", "旁遮普语"),
+    ("ro", "罗马尼亚语"),
+    ("sa", "梵语"),
+    ("sw", "斯瓦希里语"),
+    ("sv", "瑞典语"),
+    ("te", "泰卢固语"),
+    ("uk", "乌克兰语"),
+    ("ur", "乌尔都语"),
+    ("si", "僧伽罗语"),
+    ("sr", "塞尔维亚语"),
+    ("sk", "斯洛伐克语"),
+    ("bo", "藏语"),
+    ("fy", "西弗里西亚语"),
+    ("az", "阿塞拜疆语"),
+    ("am", "阿姆哈拉语"),
+    ("sq", "阿尔巴尼亚语"),
+    ("tt", "鞑靼语"),
+    ("mk", "马其顿语"),
+    ("mg", "马拉加斯语"),
+    ("mt", "马耳他语"),
+    ("ny", "齐切瓦语"),
+    ("ccp", "Chakma"),
+    ("lis", "Lisu"),
+    ("myh", "Makah"),
+    ("mez", "Menominee"),
+    ("one", "Oneida"),
+    ("crk", "Plains Cree"),
+    ("rhg", "Rohingya"),
+    ("uzs", "Southern Uzbek"),
 ]
 
 LANGUAGE_NAMES = dict(LANGUAGES)
@@ -169,6 +304,10 @@ UI_TEXT = {
         "translation_method": "翻译方式",
         "ai_translate": "AI 翻译",
         "google_translate": "Google 翻译",
+        "microsoft_translate": "Microsoft 翻译",
+        "microsoft_key": "Microsoft API KEY",
+        "microsoft_region": "Microsoft 区域",
+        "microsoft_key_help": "选择 Microsoft 回翻译时使用；也可以设置环境变量 MICROSOFT_TRANSLATOR_KEY / MICROSOFT_TRANSLATOR_REGION。",
         "ai_platform": "AI 平台",
         "country": "国家特色",
         "gender": "我的性别",
@@ -181,6 +320,7 @@ UI_TEXT = {
         "my_languages": "我的语言（最多三种）",
         "their_languages": "对方语言（最多三种）",
         "back_setting": "回翻译",
+        "back_platform_setting": "回翻译平台",
         "back_yes": "是，显示回翻译小界面",
         "back_no": "否，不进行回翻译",
         "save_settings": "保存设置",
@@ -205,6 +345,7 @@ UI_TEXT = {
         "speech_no_text": "没有可朗读的文字",
         "copied": "译文已复制",
         "pasted_external": "译文已输入到外部窗口",
+        "sent_external": "译文已发送到外部窗口，输入框已清空",
         "paste_target_missing": "没有找到外部输入窗口，已复制译文",
         "paste_failed": "输入到外部窗口失败，已复制译文",
         "no_output": "没有可复制的译文",
@@ -232,6 +373,10 @@ UI_TEXT = {
         "translation_method": "Translation Method",
         "ai_translate": "AI Translate",
         "google_translate": "Google Translate",
+        "microsoft_translate": "Microsoft Translate",
+        "microsoft_key": "Microsoft API KEY",
+        "microsoft_region": "Microsoft region",
+        "microsoft_key_help": "Used when Microsoft is selected for back translation. You can also set MICROSOFT_TRANSLATOR_KEY / MICROSOFT_TRANSLATOR_REGION.",
         "ai_platform": "AI Platform",
         "country": "Country context",
         "gender": "My gender",
@@ -244,6 +389,7 @@ UI_TEXT = {
         "my_languages": "My Languages (up to 3)",
         "their_languages": "Other Languages (up to 3)",
         "back_setting": "Back Translation",
+        "back_platform_setting": "Back-translation platform",
         "back_yes": "Yes, show the back-translation box",
         "back_no": "No, do not back-translate",
         "save_settings": "Save Settings",
@@ -268,6 +414,7 @@ UI_TEXT = {
         "speech_no_text": "No text to speak",
         "copied": "Translation copied",
         "pasted_external": "Translation pasted into the external window",
+        "sent_external": "Translation sent to the external window; input cleared",
         "paste_target_missing": "No external input window found; translation copied",
         "paste_failed": "Could not paste into the external window; translation copied",
         "no_output": "Nothing to copy",
@@ -292,6 +439,10 @@ UI_TEXT = {
         "translation_method": "翻訳方式",
         "ai_translate": "AI 翻訳",
         "google_translate": "Google 翻訳",
+        "microsoft_translate": "Microsoft 翻訳",
+        "microsoft_key": "Microsoft API KEY",
+        "microsoft_region": "Microsoft リージョン",
+        "microsoft_key_help": "逆翻訳で Microsoft を選ぶ場合に使用します。環境変数 MICROSOFT_TRANSLATOR_KEY / MICROSOFT_TRANSLATOR_REGION も使えます。",
         "ai_platform": "AI プラットフォーム",
         "country": "国の特徴",
         "gender": "自分の性別",
@@ -304,6 +455,7 @@ UI_TEXT = {
         "my_languages": "自分の言語（最大3つ）",
         "their_languages": "相手の言語（最大3つ）",
         "back_setting": "逆翻訳",
+        "back_platform_setting": "逆翻訳プラットフォーム",
         "back_yes": "はい、逆翻訳欄を表示する",
         "back_no": "いいえ、逆翻訳しない",
         "save_settings": "設定を保存",
@@ -323,6 +475,7 @@ UI_TEXT = {
         "failed": "翻訳に失敗しました",
         "copied": "翻訳をコピーしました",
         "pasted_external": "外部ウィンドウに翻訳を入力しました",
+        "sent_external": "外部ウィンドウへ送信し、入力欄をクリアしました",
         "paste_target_missing": "外部入力ウィンドウが見つかりません。翻訳をコピーしました",
         "paste_failed": "外部ウィンドウへの入力に失敗しました。翻訳をコピーしました",
         "no_output": "コピーできる翻訳がありません",
@@ -838,6 +991,8 @@ DEFAULT_CONFIG = {
     "groq_model": "llama-3.3-70b-versatile",
     "translation_platform": "Google",
     "back_platform": "Google",
+    "microsoft_key": "",
+    "microsoft_region": "",
     "my_languages": ["en", "zh-CN", "ja"],
     "their_languages": ["zh-CN", "en", "ja"],
     "source_lang": "en",
@@ -922,7 +1077,7 @@ def api_keys(raw: str) -> list[str]:
     return [line.strip() for line in raw.splitlines() if line.strip()]
 
 
-def read_http_json(url: str, payload: dict | None = None, headers: dict | None = None, timeout: int = 30):
+def read_http_json(url: str, payload: object | None = None, headers: dict | None = None, timeout: int = 30):
     data = None
     request_headers = {"User-Agent": "AI-Translator-App/1.0"}
     if headers:
@@ -1069,12 +1224,22 @@ try {{
     run_powershell_script(script, timeout=max(20, min(120, len(text) // 8 + 20)))
 
 
+GOOGLE_LANGUAGE_MAP = {
+    "pt-BR": "pt",
+    "pt-PT": "pt",
+}
+
+
+def google_language_code(language_code: str) -> str:
+    return GOOGLE_LANGUAGE_MAP.get(language_code, language_code)
+
+
 def google_translate(text: str, source_lang: str, target_lang: str) -> str:
     params = parse.urlencode(
         {
             "client": "gtx",
-            "sl": source_lang,
-            "tl": target_lang,
+            "sl": google_language_code(source_lang),
+            "tl": google_language_code(target_lang),
             "dt": "t",
             "q": text,
         }
@@ -1085,6 +1250,59 @@ def google_translate(text: str, source_lang: str, target_lang: str) -> str:
     if not translated:
         raise RuntimeError("Google 翻译没有返回内容")
     return translated
+
+
+MICROSOFT_LANGUAGE_MAP = {
+    "zh-CN": "zh-Hans",
+    "zh-TW": "zh-Hant",
+    "pt-BR": "pt",
+    "pt-PT": "pt",
+    "tl": "fil",
+}
+
+
+def microsoft_language_code(language_code: str) -> str:
+    return MICROSOFT_LANGUAGE_MAP.get(language_code, language_code)
+
+
+def microsoft_translate(text: str, source_lang: str, target_lang: str, config: dict | None = None) -> str:
+    config = config or {}
+    key = (config.get("microsoft_key") or os.environ.get("MICROSOFT_TRANSLATOR_KEY") or "").strip()
+    region = (config.get("microsoft_region") or os.environ.get("MICROSOFT_TRANSLATOR_REGION") or "").strip()
+    if not key:
+        raise RuntimeError("Microsoft 回翻译需要 Microsoft Translator API KEY。请在设置页填写，或设置 MICROSOFT_TRANSLATOR_KEY 环境变量。")
+
+    params = parse.urlencode(
+        {
+            "api-version": "3.0",
+            "from": microsoft_language_code(source_lang),
+            "to": microsoft_language_code(target_lang),
+        }
+    )
+    headers = {
+        "Accept": "application/json",
+        "Ocp-Apim-Subscription-Key": key,
+    }
+    if region:
+        headers["Ocp-Apim-Subscription-Region"] = region
+
+    data = read_http_json(
+        f"https://api.cognitive.microsofttranslator.com/translate?{params}",
+        payload=[{"Text": text}],
+        headers=headers,
+        timeout=20,
+    )
+    translations = data[0].get("translations", []) if data and isinstance(data, list) else []
+    translated = translations[0].get("text", "").strip() if translations else ""
+    if not translated:
+        raise RuntimeError("Microsoft 翻译没有返回内容")
+    return translated
+
+
+def regular_translate(text: str, source_lang: str, target_lang: str, platform: str = "Google", config: dict | None = None) -> tuple[str, str]:
+    if platform == "Microsoft":
+        return microsoft_translate(text, source_lang, target_lang, config), "Microsoft"
+    return google_translate(text, source_lang, target_lang), "Google"
 
 
 def translation_prompt(text: str, source_lang: str, target_lang: str, config: dict, back_translate: bool = False) -> str:
@@ -1177,13 +1395,17 @@ def translate_with_ai(text: str, source_lang: str, target_lang: str, config: dic
 
 
 def translate_text(text: str, source_lang: str, target_lang: str, config: dict, back_translate: bool = False) -> tuple[str, str, str]:
+    if back_translate:
+        translated, provider = regular_translate(text, source_lang, target_lang, config.get("back_platform", "Google"), config)
+        return translated, provider, ""
+
     translation_mode = config.get("translation_mode") or ("ai" if config.get("use_ai") else "google")
     if translation_mode == "ai":
         translated, provider = translate_with_ai(text, source_lang, target_lang, config, back_translate)
         return translated, provider, ""
 
-    translated = google_translate(text, source_lang, target_lang)
-    return translated, "Google", ""
+    translated, provider = regular_translate(text, source_lang, target_lang, config.get("translation_platform", "Google"), config)
+    return translated, provider, ""
 
 
 class ScrollableFrame(ttk.Frame):
@@ -1236,8 +1458,8 @@ class LanguageBar(ttk.Frame):
         self.button_area = ttk.Frame(self, style="Panel.TFrame")
         self.button_area.grid(row=0, column=0, sticky="w")
         self.more_var.set("更多语言")
-        self.more = ttk.Combobox(self, textvariable=self.more_var, values=LANGUAGE_LABELS, state="readonly", width=9)
-        self.more.grid(row=0, column=1, sticky="w", padx=(14, 0))
+        self.more = ttk.Combobox(self, textvariable=self.more_var, values=LANGUAGE_LABELS, state="readonly", width=8)
+        self.more.grid(row=0, column=1, sticky="w", padx=(8, 0))
         self.more.bind("<<ComboboxSelected>>", self._select_from_more)
 
     def set_languages(self, language_codes: list[str], active_code: str):
@@ -1259,8 +1481,8 @@ class LanguageBar(ttk.Frame):
                 text=LANGUAGE_NAMES.get(code, code),
                 relief="flat",
                 borderwidth=0,
-                padx=12,
-                pady=7,
+                padx=7,
+                pady=4,
                 cursor="hand2",
                 font="TranslatorLangBoldFont" if is_active else "TranslatorLangFont",
                 fg=BLUE if is_active else TEXT,
@@ -1293,30 +1515,76 @@ class LanguagePicker(ttk.Frame):
         self.title = title
         self.selected = list(selected)
         self.buttons: dict[str, tk.Button] = {}
+        self.columns = 0
 
-        ttk.Label(self, text=title, style="Section.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 10))
+        self.title_label = ttk.Label(self, text=title, style="Section.TLabel")
+        self.title_label.grid(row=0, column=0, sticky="w", pady=(0, 10))
         self.grid_columnconfigure(0, weight=1)
         self.options = ttk.Frame(self, style="Panel.TFrame")
         self.options.grid(row=1, column=0, sticky="ew")
+        self.bind("<Configure>", self._on_options_resize)
+        self.options.bind("<Configure>", self._on_options_resize)
         self._render_options()
 
-    def _render_options(self):
-        columns = 4
+    def _column_count(self) -> int:
+        width = max(self.options.winfo_width(), self.winfo_width())
+        if width >= 560:
+            return 4
+        if width >= 390:
+            return 3
+        if width >= 230:
+            return 2
+        return 1
+
+    def _on_options_resize(self, _event=None):
+        columns = self._column_count()
+        if columns != self.columns:
+            self._render_options(columns)
+        else:
+            self._update_button_geometry(columns)
+
+    def _render_options(self, columns: int | None = None):
+        columns = columns or self._column_count()
+        if columns == self.columns and self.buttons:
+            self._update_button_geometry(columns)
+            return
+        self.columns = columns
+        for button in self.buttons.values():
+            button.destroy()
+        self.buttons.clear()
+        for column in range(4):
+            self.options.grid_columnconfigure(column, weight=0)
+        for column in range(columns):
+            self.options.grid_columnconfigure(column, weight=1, uniform="language")
+        wrap = self._button_wraplength(columns)
         for index, (code, label) in enumerate(LANGUAGES):
             button = tk.Button(
                 self.options,
                 relief="solid",
                 borderwidth=1,
-                padx=10,
-                pady=6,
+                padx=4,
+                pady=5,
                 cursor="hand2",
                 font="TranslatorBodyFont",
+                justify="center",
+                anchor="center",
+                wraplength=wrap,
                 command=lambda value=code: self.toggle(value),
             )
-            button.grid(row=index // columns, column=index % columns, sticky="ew", padx=(0, 8), pady=(0, 8))
-            self.options.grid_columnconfigure(index % columns, weight=1)
+            button.grid(row=index // columns, column=index % columns, sticky="nsew", padx=3, pady=4)
             self.buttons[code] = button
         self.refresh()
+
+    def _button_wraplength(self, columns: int) -> int:
+        width = max(self.options.winfo_width(), self.winfo_width(), 180)
+        return max(76, min(180, int((width - (columns - 1) * 6) / max(columns, 1)) - 18))
+
+    def _update_button_geometry(self, columns: int | None = None):
+        columns = columns or self.columns or self._column_count()
+        wrap = self._button_wraplength(columns)
+        self.title_label.configure(wraplength=max(120, self.winfo_width() - 8))
+        for button in self.buttons.values():
+            button.configure(wraplength=wrap)
 
     def toggle(self, code: str):
         if code in self.selected:
@@ -1363,11 +1631,18 @@ class TranslatorApp(tk.Tk):
         self.pending_translation_source = ""
         self.last_translation_source = ""
         self.ready_to_paste = False
+        self.ready_to_send_external = False
+        self.external_send_hwnd = None
+        self.external_focus_hwnd = None
+        self.external_caret_point = None
+        self.external_restore_topmost = False
+        self.current_page = "translate"
         self.process_id = int(KERNEL32.GetCurrentProcessId()) if IS_WINDOWS and KERNEL32 is not None else 0
 
         self.title(self._ui("app_title"))
-        self.minsize(420, 320)
-        self.geometry("780x620")
+        self._apply_window_icon()
+        self.minsize(330, 240)
+        self.geometry("700x540")
         self.configure(bg=BG)
         self._setup_fonts()
         self._setup_styles()
@@ -1378,8 +1653,19 @@ class TranslatorApp(tk.Tk):
         self._refresh_language_bars()
         self._refresh_back_panel()
         self.bind("<Configure>", self._on_window_resize)
+        self.bind("<Return>", self._submit_from_keyboard)
+        self.bind("<Control-Return>", self._submit_from_keyboard)
         self.after(250, self._track_foreground_window)
         self.after(100, self._poll_results)
+
+    def _apply_window_icon(self):
+        icon_path = resource_path(APP_ICON)
+        if not icon_path.exists():
+            return
+        try:
+            self.iconbitmap(default=str(icon_path))
+        except tk.TclError:
+            pass
 
     def _ui(self, key: str) -> str:
         language = self.config_data.get("ui_language", "zh-CN")
@@ -1422,6 +1708,7 @@ class TranslatorApp(tk.Tk):
         style.configure("Status.TLabel", background=BG, foreground=MUTED, font=self._font_name("status"))
         style.configure("Primary.TButton", font=self._font_name("body_bold"))
         style.configure("TButton", font=self._font_name("body"))
+        style.configure("Small.TButton", font=self._font_name("muted"), padding=(4, 1))
         style.configure("TCheckbutton", background=PANEL, foreground=TEXT, font=self._font_name("body"))
         style.configure("TRadiobutton", background=PANEL, foreground=TEXT, font=self._font_name("body"))
 
@@ -1490,10 +1777,13 @@ class TranslatorApp(tk.Tk):
             "font": self.font_page,
             "display": self.display_page,
         }
+        self.current_page = page_name
         pages[page_name].tkraise()
         for name, button in self.nav_buttons.items():
             selected = name == page_name
             button.configure(bg="#eaf2ff" if selected else PANEL, fg=BLUE if selected else TEXT)
+        if page_name == "translate":
+            self.after_idle(self._focus_input_text_end)
 
     def _build_translate_page(self):
         page = self.translate_page
@@ -1515,14 +1805,11 @@ class TranslatorApp(tk.Tk):
         self.source_panel = self._panel(self.translate_panes)
         self.source_panel.grid_rowconfigure(1, weight=1)
         self.source_panel.grid_columnconfigure(0, weight=1)
-        self.source_panel.grid_columnconfigure(1, weight=0)
         top_source = ttk.Frame(self.source_panel, style="Panel.TFrame")
-        top_source.grid(row=0, column=0, columnspan=2, sticky="ew", padx=8, pady=(6, 2))
+        top_source.grid(row=0, column=0, sticky="ew", padx=8, pady=(6, 2))
         top_source.grid_columnconfigure(0, weight=1)
         self.source_bar = LanguageBar(top_source, self._source_language_changed)
         self.source_bar.grid(row=0, column=0, sticky="w")
-        self.swap_button = ttk.Button(top_source, text=self._ui("swap_languages"), command=self.swap_languages)
-        self.swap_button.grid(row=0, column=1, sticky="e")
         self.input_text = tk.Text(
             self.source_panel,
             wrap="word",
@@ -1535,17 +1822,45 @@ class TranslatorApp(tk.Tk):
             padx=8,
             pady=6,
         )
-        self.input_text.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        self.input_text.grid(row=1, column=0, sticky="nsew")
         self.input_text.bind("<Return>", self._submit_from_keyboard)
         self.input_text.bind("<Control-Return>", self._submit_from_keyboard)
         self.input_text.bind("<Shift-Return>", self._insert_newline)
         source_audio = ttk.Frame(self.source_panel, style="Panel.TFrame")
-        source_audio.grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 6))
-        self.listen_button = ttk.Button(source_audio, text=f"🎙 {self._ui('listen_input')}", command=self.start_speech_input)
+        source_audio.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 6))
+        self.listen_button = ttk.Button(
+            source_audio,
+            text="🎙",
+            width=3,
+            style="Small.TButton",
+            command=self.start_speech_input,
+        )
         self.listen_button.grid(row=0, column=0, sticky="w")
-        self.speak_input_button = ttk.Button(source_audio, text=f"🔊 {self._ui('speak_input')}", command=self.speak_input_text)
-        self.speak_input_button.grid(row=0, column=1, sticky="w", padx=(8, 0))
-        self.translate_panes.add(self.source_panel, minsize=80)
+        self.speak_input_button = ttk.Button(
+            source_audio,
+            text="🔊",
+            width=3,
+            style="Small.TButton",
+            command=self.speak_input_text,
+        )
+        self.speak_input_button.grid(row=0, column=1, sticky="w", padx=(6, 0))
+        self.clear_input_button = ttk.Button(
+            source_audio,
+            text=self._ui("clear"),
+            width=6,
+            style="Small.TButton",
+            command=self.clear_texts,
+        )
+        self.clear_input_button.grid(row=0, column=2, sticky="w", padx=(6, 0))
+        self.swap_button = ttk.Button(
+            source_audio,
+            text=self._ui("swap_languages"),
+            width=9,
+            style="Small.TButton",
+            command=self.swap_languages,
+        )
+        self.swap_button.grid(row=0, column=3, sticky="w", padx=(6, 0))
+        self.translate_panes.add(self.source_panel, minsize=54)
 
         self.target_panel = self._panel(self.translate_panes)
         self.target_panel.grid_rowconfigure(1, weight=1)
@@ -1566,9 +1881,15 @@ class TranslatorApp(tk.Tk):
         self.output_text.grid(row=1, column=0, sticky="nsew")
         target_audio = ttk.Frame(self.target_panel, style="Panel.TFrame")
         target_audio.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 6))
-        self.speak_output_button = ttk.Button(target_audio, text=f"🔊 {self._ui('speak_output')}", command=self.speak_output_text)
+        self.speak_output_button = ttk.Button(
+            target_audio,
+            text="🔊",
+            width=3,
+            style="Small.TButton",
+            command=self.speak_output_text,
+        )
         self.speak_output_button.grid(row=0, column=0, sticky="w")
-        self.translate_panes.add(self.target_panel, minsize=80)
+        self.translate_panes.add(self.target_panel, minsize=54)
 
         self.back_panel = self._panel(self.translate_panes)
         self.back_panel.grid_rowconfigure(1, weight=1)
@@ -1590,14 +1911,14 @@ class TranslatorApp(tk.Tk):
             state="disabled",
         )
         self.back_text.grid(row=1, column=0, sticky="nsew")
-        self.translate_panes.add(self.back_panel, minsize=60)
+        self.translate_panes.add(self.back_panel, minsize=38)
         self.back_panel_visible = True
         self.after(200, self._set_initial_pane_sizes)
 
         actions = ttk.Frame(page, style="App.TFrame")
         actions.grid(row=1, column=0, sticky="ew")
         actions.grid_columnconfigure(0, weight=1)
-        self.translate_button = ttk.Button(actions, text=self._ui("translate"), style="Primary.TButton", command=self.start_translation)
+        self.translate_button = ttk.Button(actions, text=self._ui("translate"), style="Primary.TButton", command=self._submit_from_keyboard)
         self.translate_button.grid(row=0, column=1, padx=(8, 0))
         ttk.Button(actions, text=self._ui("copy_output"), command=self.copy_output).grid(row=0, column=2, padx=(8, 0))
         ttk.Button(actions, text=self._ui("clear"), command=self.clear_texts).grid(row=0, column=3, padx=(8, 0))
@@ -1635,8 +1956,8 @@ class TranslatorApp(tk.Tk):
         selected_mode = self.config_data.get("translation_mode") or ("ai" if self.config_data.get("use_ai") else "google")
         self.translation_mode_var = tk.StringVar(value=selected_mode)
         self.use_ai_var = tk.BooleanVar(value=selected_mode == "ai")
-        self.translation_platform_var = tk.StringVar(value="Google")
-        self.back_platform_var = tk.StringVar(value="Google")
+        self.translation_platform_var = tk.StringVar(value=self.config_data.get("translation_platform", "Google"))
+        self.back_platform_var = tk.StringVar(value=self.config_data.get("back_platform", "Google"))
         mode_frame = ttk.Frame(engine_panel, style="Panel.TFrame")
         mode_frame.grid(row=1, column=0, sticky="w", padx=18, pady=(0, 12))
         ttk.Radiobutton(
@@ -1702,24 +2023,49 @@ class TranslatorApp(tk.Tk):
         self.groq_model_var = tk.StringVar(value=self.config_data.get("groq_model", GROQ_MODELS[1]))
         self._labeled_combo(self.groq_panel, 2, self._ui("groq_model"), self.groq_model_var, GROQ_MODELS)
 
-        language_panel = self._panel(content)
-        language_panel.grid(row=2, column=0, sticky="ew", pady=(0, 12))
-        language_panel.grid_columnconfigure(0, weight=1)
-        language_panel.grid_columnconfigure(1, weight=1)
-        self.my_picker = LanguagePicker(language_panel, self._ui("my_languages"), self.config_data.get("my_languages", []))
-        self.my_picker.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
-        self.their_picker = LanguagePicker(language_panel, self._ui("their_languages"), self.config_data.get("their_languages", []))
-        self.their_picker.grid(row=0, column=1, sticky="nsew", padx=18, pady=18)
+        self.language_panel = self._panel(content)
+        self.language_panel.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+        self.language_panel.grid_columnconfigure(0, weight=1)
+        self.language_panel.grid_columnconfigure(1, weight=1)
+        self.my_picker = LanguagePicker(self.language_panel, self._ui("my_languages"), self.config_data.get("my_languages", []))
+        self.their_picker = LanguagePicker(self.language_panel, self._ui("their_languages"), self.config_data.get("their_languages", []))
+        self.language_panel.bind("<Configure>", self._layout_language_pickers)
+        self.after_idle(self._layout_language_pickers)
 
         back_panel = self._panel(content)
         back_panel.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        back_panel.grid_columnconfigure(1, weight=1)
         ttk.Label(back_panel, text=self._ui("back_setting"), style="Section.TLabel").grid(row=0, column=0, sticky="w", padx=18, pady=(18, 12))
         self.back_translate_var = tk.BooleanVar(value=bool(self.config_data.get("back_translate")))
         ttk.Radiobutton(back_panel, text=self._ui("back_yes"), variable=self.back_translate_var, value=True).grid(
             row=1, column=0, sticky="w", padx=18, pady=6
         )
         ttk.Radiobutton(back_panel, text=self._ui("back_no"), variable=self.back_translate_var, value=False).grid(
-            row=2, column=0, sticky="w", padx=18, pady=(6, 18)
+            row=2, column=0, sticky="w", padx=18, pady=6
+        )
+        ttk.Label(back_panel, text=self._ui("back_platform_setting"), style="Label.TLabel").grid(
+            row=3, column=0, sticky="w", padx=18, pady=(12, 6)
+        )
+        back_platform_frame = ttk.Frame(back_panel, style="Panel.TFrame")
+        back_platform_frame.grid(row=4, column=0, sticky="w", padx=18, pady=(0, 18))
+        ttk.Radiobutton(
+            back_platform_frame,
+            text=self._ui("google_translate"),
+            variable=self.back_platform_var,
+            value="Google",
+        ).grid(row=0, column=0, padx=(0, 22))
+        ttk.Radiobutton(
+            back_platform_frame,
+            text=self._ui("microsoft_translate"),
+            variable=self.back_platform_var,
+            value="Microsoft",
+        ).grid(row=0, column=1)
+        self.microsoft_key_var = tk.StringVar(value=self.config_data.get("microsoft_key", ""))
+        self.microsoft_region_var = tk.StringVar(value=self.config_data.get("microsoft_region", ""))
+        self._labeled_entry(back_panel, 5, self._ui("microsoft_key"), self.microsoft_key_var, "")
+        self._labeled_entry(back_panel, 6, self._ui("microsoft_region"), self.microsoft_region_var, "例如 eastasia / westus / global")
+        ttk.Label(back_panel, text=self._ui("microsoft_key_help"), style="Muted.TLabel").grid(
+            row=7, column=1, sticky="w", padx=12, pady=(0, 18)
         )
 
         actions = ttk.Frame(content, style="App.TFrame")
@@ -1727,6 +2073,39 @@ class TranslatorApp(tk.Tk):
         actions.grid_columnconfigure(0, weight=1)
         ttk.Button(actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1, padx=(8, 0))
         self._refresh_translation_method_visibility()
+
+    def _layout_language_pickers(self, event=None):
+        if not hasattr(self, "language_panel"):
+            return
+        width = event.width if event is not None else self.language_panel.winfo_width()
+        stacked = width < 620
+        mode = "stacked" if stacked else "side_by_side"
+        if getattr(self, "language_layout_mode", None) == mode:
+            self.my_picker._on_options_resize()
+            self.their_picker._on_options_resize()
+            return
+
+        self.language_layout_mode = mode
+        self.my_picker.grid_forget()
+        self.their_picker.grid_forget()
+
+        if stacked:
+            self.language_panel.grid_columnconfigure(0, weight=1, uniform="")
+            self.language_panel.grid_columnconfigure(1, weight=0, uniform="")
+            self.language_panel.grid_rowconfigure(0, weight=0)
+            self.language_panel.grid_rowconfigure(1, weight=0)
+            self.my_picker.grid(row=0, column=0, sticky="ew", padx=18, pady=(18, 8))
+            self.their_picker.grid(row=1, column=0, sticky="ew", padx=18, pady=(8, 18))
+        else:
+            self.language_panel.grid_columnconfigure(0, weight=1, uniform="language_picker")
+            self.language_panel.grid_columnconfigure(1, weight=1, uniform="language_picker")
+            self.language_panel.grid_rowconfigure(0, weight=0)
+            self.language_panel.grid_rowconfigure(1, weight=0)
+            self.my_picker.grid(row=0, column=0, sticky="nsew", padx=18, pady=18)
+            self.their_picker.grid(row=0, column=1, sticky="nsew", padx=18, pady=18)
+
+        self.after_idle(self.my_picker._on_options_resize)
+        self.after_idle(self.their_picker._on_options_resize)
 
     def _build_font_page(self):
         self.font_page.grid_columnconfigure(0, weight=1)
@@ -1817,8 +2196,8 @@ class TranslatorApp(tk.Tk):
     def _on_window_resize(self, event):
         if event.widget is not self:
             return
-        scale = min(event.width / 780, event.height / 620)
-        scale = max(0.72, min(1.35, scale))
+        scale = min(event.width / 700, event.height / 540)
+        scale = max(0.58, min(1.35, scale))
         if abs(scale - self.ui_scale) < 0.04:
             return
         self.ui_scale = scale
@@ -1842,9 +2221,9 @@ class TranslatorApp(tk.Tk):
 
         if hasattr(self, "translate_panes") and hasattr(self, "back_panel"):
             try:
-                self.translate_panes.paneconfigure(self.source_panel, minsize=max(64, int(round(80 * self.ui_scale))))
-                self.translate_panes.paneconfigure(self.target_panel, minsize=max(64, int(round(80 * self.ui_scale))))
-                self.translate_panes.paneconfigure(self.back_panel, minsize=max(50, int(round(60 * self.ui_scale))))
+                self.translate_panes.paneconfigure(self.source_panel, minsize=max(48, int(round(64 * self.ui_scale))))
+                self.translate_panes.paneconfigure(self.target_panel, minsize=max(48, int(round(64 * self.ui_scale))))
+                self.translate_panes.paneconfigure(self.back_panel, minsize=max(34, int(round(44 * self.ui_scale))))
             except tk.TclError:
                 pass
 
@@ -1852,12 +2231,12 @@ class TranslatorApp(tk.Tk):
         if not hasattr(self, "translate_panes") or not self.back_panel_visible:
             return
         height = self.translate_panes.winfo_height()
-        if height < 220:
+        if height < 150:
             self.after(150, self._set_initial_pane_sizes)
             return
         try:
-            back_height = max(58, min(100, int(height * 0.16)))
-            main_height = max(80, (height - back_height) // 2)
+            back_height = max(36, min(82, int(height * 0.16)))
+            main_height = max(52, (height - back_height) // 2)
             self.translate_panes.sash_place(0, 0, main_height)
             self.translate_panes.sash_place(1, 0, main_height * 2)
         except tk.TclError:
@@ -1961,6 +2340,86 @@ class TranslatorApp(tk.Tk):
         USER32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
         USER32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
+    def _send_enter_key(self):
+        if not IS_WINDOWS or USER32 is None:
+            return
+        USER32.keybd_event(VK_RETURN, 0, 0, 0)
+        USER32.keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, 0)
+
+    def _send_ctrl_v_and_remember_external_focus(self, hwnd):
+        self._send_ctrl_v()
+        self.after(180, lambda: self._remember_external_input_focus(hwnd))
+
+    def _remember_external_input_focus(self, hwnd):
+        if not IS_WINDOWS or USER32 is None or not self._is_valid_external_window(hwnd):
+            return
+        try:
+            thread_id = int(USER32.GetWindowThreadProcessId(int(hwnd), None))
+            info = GUITHREADINFO()
+            info.cbSize = ctypes.sizeof(GUITHREADINFO)
+            if not USER32.GetGUIThreadInfo(thread_id, ctypes.byref(info)):
+                return
+
+            focus_hwnd = int(info.hwndFocus or info.hwndCaret or 0)
+            if focus_hwnd and USER32.IsWindow(focus_hwnd):
+                self.external_focus_hwnd = focus_hwnd
+
+            rect = info.rcCaret
+            x = int((rect.left + rect.right) / 2) if rect.right or rect.left else int(rect.left)
+            y = int((rect.top + rect.bottom) / 2) if rect.bottom or rect.top else int(rect.top)
+            if x > 0 and y > 0:
+                self.external_caret_point = (x, y)
+        except Exception:
+            pass
+
+    def _restore_external_input_focus(self):
+        if not IS_WINDOWS or USER32 is None:
+            return
+        focus_hwnd = int(self.external_focus_hwnd or 0)
+        if focus_hwnd and USER32.IsWindow(focus_hwnd):
+            try:
+                current_thread = int(KERNEL32.GetCurrentThreadId())
+                focus_thread = int(USER32.GetWindowThreadProcessId(focus_hwnd, None))
+                attached = False
+                if focus_thread and focus_thread != current_thread:
+                    attached = bool(USER32.AttachThreadInput(current_thread, focus_thread, True))
+                try:
+                    USER32.SetFocus(focus_hwnd)
+                finally:
+                    if attached:
+                        USER32.AttachThreadInput(current_thread, focus_thread, False)
+            except Exception:
+                pass
+
+        if self.external_caret_point:
+            try:
+                x, y = self.external_caret_point
+                USER32.SetCursorPos(int(x), int(y))
+                USER32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+                USER32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            except Exception:
+                pass
+
+    def _focus_app_window(self):
+        try:
+            self.lift()
+            self.focus_force()
+            if IS_WINDOWS and USER32 is not None:
+                USER32.SetForegroundWindow(self._own_hwnd())
+        except tk.TclError:
+            pass
+
+    def _focus_input_text_end(self):
+        if not hasattr(self, "input_text"):
+            return
+        self._focus_app_window()
+        try:
+            self.input_text.focus_set()
+            self.input_text.mark_set("insert", "end-1c")
+            self.input_text.see("insert")
+        except tk.TclError:
+            pass
+
     def _restore_clipboard_text(self, text: str | None, had_text: bool):
         if not had_text:
             return
@@ -2029,11 +2488,20 @@ class TranslatorApp(tk.Tk):
             self.groq_panel.grid()
 
     def _submit_from_keyboard(self, _event=None):
+        if getattr(self, "current_page", "translate") != "translate":
+            return None
+
         current_input = self.input_text.get("1.0", "end").strip()
         output = self._get_text(self.output_text)
-        if self.ready_to_paste and output and current_input == self.last_translation_source:
+        if self.ready_to_send_external and output and current_input == self.last_translation_source:
+            self.send_external_message_and_clear()
+        elif self.ready_to_paste and output and current_input == self.last_translation_source:
             self.paste_output_to_external()
         else:
+            focus_widget = self.focus_get()
+            if focus_widget is not self.input_text and not current_input:
+                self._focus_input_text_end()
+                return "break"
             self.start_translation()
         return "break"
 
@@ -2059,6 +2527,8 @@ class TranslatorApp(tk.Tk):
         ui_language = UI_LANGUAGE_CODES.get(self.ui_language_var.get(), "zh-CN")
         translation_mode = self.translation_mode_var.get() if self.translation_mode_var.get() in ("ai", "google") else "google"
         ai_provider = self.ai_provider_var.get() if self.ai_provider_var.get() in ("gemini", "groq") else "gemini"
+        translation_platform = self.translation_platform_var.get() if self.translation_platform_var.get() in ("Google", "Microsoft") else "Google"
+        back_platform = self.back_platform_var.get() if self.back_platform_var.get() in ("Google", "Microsoft") else "Google"
         input_font_size = self._safe_font_size(self.input_font_size_var, self.config_data.get("input_font_size", 13))
         output_font_size = self._safe_font_size(self.output_font_size_var, self.config_data.get("output_font_size", 13))
         back_font_size = self._safe_font_size(self.back_font_size_var, self.config_data.get("back_font_size", 11))
@@ -2076,8 +2546,10 @@ class TranslatorApp(tk.Tk):
                 "groq_keys": self.groq_keys.get("1.0", "end").strip(),
                 "gemini_model": self.gemini_model_var.get(),
                 "groq_model": self.groq_model_var.get(),
-                "translation_platform": self.translation_platform_var.get(),
-                "back_platform": self.back_platform_var.get(),
+                "translation_platform": translation_platform,
+                "back_platform": back_platform,
+                "microsoft_key": self.microsoft_key_var.get().strip(),
+                "microsoft_region": self.microsoft_region_var.get().strip(),
                 "my_languages": normalize_language_list(my_languages, DEFAULT_CONFIG["my_languages"]),
                 "their_languages": normalize_language_list(their_languages, DEFAULT_CONFIG["their_languages"]),
                 "back_translate": self.back_translate_var.get(),
@@ -2103,7 +2575,7 @@ class TranslatorApp(tk.Tk):
         self.back_title_var.set(self._ui("back_to").format(source=source_name))
         if self.config_data.get("back_translate"):
             if not getattr(self, "back_panel_visible", False):
-                self.translate_panes.add(self.back_panel, minsize=max(50, int(round(60 * self.ui_scale))))
+                self.translate_panes.add(self.back_panel, minsize=max(34, int(round(44 * self.ui_scale))))
                 self.back_panel_visible = True
                 self.after(50, self._set_initial_pane_sizes)
         else:
@@ -2182,6 +2654,11 @@ class TranslatorApp(tk.Tk):
         config_snapshot = self.config_data.copy()
         self.translation_running = True
         self.ready_to_paste = False
+        self.ready_to_send_external = False
+        self.external_send_hwnd = None
+        self.external_focus_hwnd = None
+        self.external_caret_point = None
+        self.external_restore_topmost = False
         self.pending_translation_source = text
         self.translate_button.configure(state="disabled")
         self.status_var.set(self._ui("translating"))
@@ -2223,12 +2700,22 @@ class TranslatorApp(tk.Tk):
             self._set_text(self.back_text, payload.back_text)
             self.last_translation_source = self.pending_translation_source
             self.ready_to_paste = bool(payload.text)
+            self.ready_to_send_external = False
+            self.external_send_hwnd = None
+            self.external_focus_hwnd = None
+            self.external_caret_point = None
+            self.external_restore_topmost = False
             if payload.warning:
                 self.status_var.set(f"{self._ui('done').format(provider=payload.provider)}（{payload.warning[:80]}）")
             else:
                 self.status_var.set(self._ui("done").format(provider=payload.provider))
         elif isinstance(payload, Exception):
             self.ready_to_paste = False
+            self.ready_to_send_external = False
+            self.external_send_hwnd = None
+            self.external_focus_hwnd = None
+            self.external_caret_point = None
+            self.external_restore_topmost = False
             self.status_var.set(self._ui("failed"))
             messagebox.showerror(self._ui("failed"), str(payload))
 
@@ -2355,15 +2842,73 @@ class TranslatorApp(tk.Tk):
             self.status_var.set(self._ui("paste_failed"))
             return
 
-        self.after(120, self._send_ctrl_v)
+        self.after(120, lambda: self._send_ctrl_v_and_remember_external_focus(hwnd))
+        self.ready_to_paste = False
+        self.ready_to_send_external = True
+        self.external_send_hwnd = hwnd
+        self.after(450, self._focus_input_text_end)
         self.after(900, lambda: self._restore_clipboard_text(old_clipboard_text, had_clipboard_text))
         self.status_var.set(self._ui("pasted_external"))
+
+    def send_external_message_and_clear(self):
+        if not IS_WINDOWS:
+            self.status_var.set(self._ui("paste_target_missing"))
+            return
+
+        hwnd = self.external_send_hwnd if self._is_valid_external_window(self.external_send_hwnd) else self._paste_target_hwnd()
+        if not hwnd:
+            self.status_var.set(self._ui("paste_failed"))
+            return
+
+        try:
+            self.external_restore_topmost = bool(self.attributes("-topmost"))
+            if self.external_restore_topmost:
+                self.attributes("-topmost", False)
+        except tk.TclError:
+            self.external_restore_topmost = False
+
+        focused = self._focus_external_window(hwnd)
+        if not focused and not self.external_caret_point:
+            self._restore_topmost_after_external_send()
+            self.status_var.set(self._ui("paste_failed"))
+            return
+
+        self.after(160, self._restore_external_input_focus)
+        self.after(340, self._send_enter_key)
+        self.after(560, self._clear_input_after_external_send)
+
+    def _clear_input_after_external_send(self):
+        self.input_text.delete("1.0", "end")
+        self.ready_to_paste = False
+        self.ready_to_send_external = False
+        self.external_send_hwnd = None
+        self.external_focus_hwnd = None
+        self.external_caret_point = None
+        self.pending_translation_source = ""
+        self.last_translation_source = ""
+        self.status_var.set(self._ui("sent_external"))
+        self._restore_topmost_after_external_send()
+        self._focus_input_text_end()
+
+    def _restore_topmost_after_external_send(self):
+        if not self.external_restore_topmost:
+            return
+        try:
+            self.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        self.external_restore_topmost = False
 
     def clear_texts(self):
         self.input_text.delete("1.0", "end")
         self._set_text(self.output_text, "")
         self._set_text(self.back_text, "")
         self.ready_to_paste = False
+        self.ready_to_send_external = False
+        self.external_send_hwnd = None
+        self.external_focus_hwnd = None
+        self.external_caret_point = None
+        self.external_restore_topmost = False
         self.pending_translation_source = ""
         self.last_translation_source = ""
         self.status_var.set(self._ui("cleared"))

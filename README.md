@@ -12,11 +12,11 @@ py -3 translator_app.py
 
 ## 发布与验证
 
-当前发布版本：`v1.0.6`
+当前发布版本：`v2.0.0`
 
-- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v1.0.6
-- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v1.0.6
-- 构建产物：`AI-Translate-Assistant-v1.0.6-win-x64.zip`
+- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v2.0.0
+- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v2.0.0
+- 构建产物：`AI-Translate-Assistant-v2.0.0-win-x64.zip`
 - 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
 - 构建方式：GitHub Actions tag push 触发
 - 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
@@ -25,14 +25,14 @@ py -3 translator_app.py
 
 ```powershell
 # 下载 Release 产物后计算 SHA256
-Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v1.0.6-win-x64.zip
+Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v2.0.0-win-x64.zip
 ```
 
 也可以使用 GitHub CLI 验证软件来源：
 
 ```bash
-gh attestation verify ./AI-Translate-Assistant-v1.0.6-win-x64.zip --repo secure-artifacts/translate
-gh attestation verify ./AI-Translate-Assistant-v1.0.6-win-x64.zip --repo ifghjb169-hash/translate
+gh attestation verify ./AI-Translate-Assistant-v2.0.0-win-x64.zip --repo secure-artifacts/translate
+gh attestation verify ./AI-Translate-Assistant-v2.0.0-win-x64.zip --repo ifghjb169-hash/translate
 ```
 
 ## 已实现功能
@@ -41,7 +41,8 @@ gh attestation verify ./AI-Translate-Assistant-v1.0.6-win-x64.zip --repo ifghjb1
 - 上下两个翻译框各显示三种可切换语言，并带更多语言下拉选择。
 - 输入框支持默认麦克风语音输入，并可通过默认扬声器朗读输入内容。
 - 译文框支持通过默认扬声器朗读翻译后的内容。
-- “交换语言”按钮位于输入框右上角，会对调上下语言；如果已有译文，也会把译文放回输入框方便继续翻译。
+- 软件窗口和打包后的 EXE 使用羽毛图标。
+- “交换语言”按钮位于输入框下方工具行，会对调上下语言；如果已有译文，也会把译文放回输入框方便继续翻译。
 - 顶部使用等尺寸导航按钮：翻译、设置、文字大小、界面语言。
 - 设置页支持窗口永远置顶。
 - 支持选择 `AI 翻译` 或 `Google 翻译`；Google 模式只使用 Google 翻译。
@@ -52,10 +53,11 @@ gh attestation verify ./AI-Translate-Assistant-v1.0.6-win-x64.zip --repo ifghjb1
 - “文字大小”页可分别设置输入框、译文框、回翻译框文字大小。
 - 软件系统界面文字会随窗口缩放自动调整。
 - 支持选择我的语言和对方语言，每组最多三种，已选语言会显示蓝色对勾。
-- 语言列表包含尼泊尔语和缅甸语。
+- 语言列表已合并浏览器翻译扩展中的 127 种语言。
 - 支持国家特色、我的性别、Gemini/Groq 模型选择。
 - 支持开启或关闭回翻译。
-- 输入框按第一次 `Enter` 开始翻译；译文完成后，第二次 `Enter` 会把译文输入到最近一次获得焦点的外部窗口输入框里。
+- 输入框按第一次 `Enter` 开始翻译；译文完成后，第二次 `Enter` 会把译文输入到最近一次获得焦点的外部窗口输入框里；第三次 `Enter` 会尝试发送外部消息并清空本软件输入框。
+- 底部“翻译”按钮与 `Enter` 使用相同流程。
 - 使用外部输入时，先点一下 FB、Teams、记事本等软件里的聊天框/输入框，再回到翻译软件输入并翻译；软件会记住那个外部窗口。
 - 按 `Shift+Enter` 可在输入框内换行。
 - 窗口可自由调整大小，最小尺寸已放宽到更窄的 `420x320`。
