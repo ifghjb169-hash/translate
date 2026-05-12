@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 import tkinter.font as tkfont
 from dataclasses import dataclass
@@ -89,6 +90,22 @@ class GUITHREADINFO(ctypes.Structure):
     ]
 
 
+PTR_BITS = ctypes.sizeof(ctypes.c_void_p) * 8
+ULONG_PTR = ctypes.c_uint64 if PTR_BITS == 64 else ctypes.c_ulong
+LONG_PTR = ctypes.c_int64 if PTR_BITS == 64 else ctypes.c_long
+UINT_PTR = ctypes.c_uint64 if PTR_BITS == 64 else ctypes.c_uint
+
+
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [
+        ("vkCode", wintypes.DWORD),
+        ("scanCode", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ULONG_PTR),
+    ]
+
+
 IS_WINDOWS = sys.platform.startswith("win")
 CREATE_NO_WINDOW = 0x08000000 if IS_WINDOWS else 0
 if IS_WINDOWS:
@@ -99,10 +116,27 @@ if IS_WINDOWS:
     GW_HWNDNEXT = 2
     VK_CONTROL = 0x11
     VK_RETURN = 0x0D
+    VK_A = 0x41
+    VK_C = 0x43
     VK_V = 0x56
+    WH_KEYBOARD_LL = 13
+    HC_ACTION = 0
+    WM_KEYDOWN = 0x0100
+    WM_SYSKEYDOWN = 0x0104
+    LLKHF_INJECTED = 0x00000010
     KEYEVENTF_KEYUP = 0x0002
     MOUSEEVENTF_LEFTDOWN = 0x0002
     MOUSEEVENTF_LEFTUP = 0x0004
+    LRESULT = ctypes.c_ssize_t
+    LOW_LEVEL_KEYBOARD_PROC = ctypes.WINFUNCTYPE(LRESULT, ctypes.c_int, UINT_PTR, LONG_PTR)
+    USER32.SetWindowsHookExW.argtypes = [ctypes.c_int, LOW_LEVEL_KEYBOARD_PROC, wintypes.HINSTANCE, wintypes.DWORD]
+    USER32.SetWindowsHookExW.restype = wintypes.HHOOK
+    USER32.CallNextHookEx.argtypes = [wintypes.HHOOK, ctypes.c_int, UINT_PTR, LONG_PTR]
+    USER32.CallNextHookEx.restype = LRESULT
+    USER32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
+    USER32.UnhookWindowsHookEx.restype = wintypes.BOOL
+    KERNEL32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+    KERNEL32.GetModuleHandleW.restype = wintypes.HMODULE
 else:
     USER32 = None
     KERNEL32 = None
@@ -111,10 +145,18 @@ else:
     GW_HWNDNEXT = 2
     VK_CONTROL = 0x11
     VK_RETURN = 0x0D
+    VK_A = 0x41
+    VK_C = 0x43
     VK_V = 0x56
+    WH_KEYBOARD_LL = 13
+    HC_ACTION = 0
+    WM_KEYDOWN = 0x0100
+    WM_SYSKEYDOWN = 0x0104
+    LLKHF_INJECTED = 0x00000010
     KEYEVENTF_KEYUP = 0x0002
     MOUSEEVENTF_LEFTDOWN = 0x0002
     MOUSEEVENTF_LEFTUP = 0x0004
+    LOW_LEVEL_KEYBOARD_PROC = None
 
 
 LANGUAGES = [
@@ -290,6 +332,8 @@ UI_TEXT = {
         "settings_tab": "设置",
         "font_tab": "文字大小",
         "display_tab": "界面语言",
+        "text_tab": "文字",
+        "direct_tab": "直译",
         "swap_languages": "⇅ 交换语言",
         "translate": "翻译",
         "copy_output": "复制译文",
@@ -346,6 +390,16 @@ UI_TEXT = {
         "copied": "译文已复制",
         "pasted_external": "译文已输入到外部窗口",
         "sent_external": "译文已发送到外部窗口，输入框已清空",
+        "direct_enabled": "直译已开启：在聊天输入框按 Enter 会翻译并替换",
+        "direct_disabled": "直译已关闭",
+        "direct_unavailable": "直译只支持 Windows 外部输入窗口",
+        "direct_capturing": "正在读取聊天输入...",
+        "direct_captured": "已读取外部输入，正在直译...",
+        "direct_waiting": "正在直译，请稍等",
+        "direct_ready": "直译完成，正在替换聊天框内容...",
+        "direct_replaced": "已替换聊天框内容，再按 Enter 发送",
+        "direct_sent": "直译消息已发送，输入框已清空",
+        "direct_input_missing": "聊天输入框没有可直译的内容",
         "paste_target_missing": "没有找到外部输入窗口，已复制译文",
         "paste_failed": "输入到外部窗口失败，已复制译文",
         "no_output": "没有可复制的译文",
@@ -359,6 +413,8 @@ UI_TEXT = {
         "settings_tab": "Settings",
         "font_tab": "Text Size",
         "display_tab": "Interface",
+        "text_tab": "Text",
+        "direct_tab": "Direct",
         "swap_languages": "⇅ Swap Languages",
         "translate": "Translate",
         "copy_output": "Copy",
@@ -415,6 +471,16 @@ UI_TEXT = {
         "copied": "Translation copied",
         "pasted_external": "Translation pasted into the external window",
         "sent_external": "Translation sent to the external window; input cleared",
+        "direct_enabled": "Direct mode is on: Enter in the chat input translates and replaces",
+        "direct_disabled": "Direct mode is off",
+        "direct_unavailable": "Direct mode only supports Windows external input windows",
+        "direct_capturing": "Reading the chat input...",
+        "direct_captured": "External input captured, translating...",
+        "direct_waiting": "Translating, please wait",
+        "direct_ready": "Direct translation ready. Replacing the chat input...",
+        "direct_replaced": "Chat input replaced. Press Enter again to send.",
+        "direct_sent": "Direct message sent; input cleared",
+        "direct_input_missing": "No text found in the chat input",
         "paste_target_missing": "No external input window found; translation copied",
         "paste_failed": "Could not paste into the external window; translation copied",
         "no_output": "Nothing to copy",
@@ -428,6 +494,8 @@ UI_TEXT = {
         "settings_tab": "設定",
         "font_tab": "文字サイズ",
         "display_tab": "表示言語",
+        "text_tab": "文字",
+        "direct_tab": "直訳",
         "swap_languages": "⇅ 言語を交換",
         "translate": "翻訳",
         "copy_output": "翻訳をコピー",
@@ -491,6 +559,8 @@ UI_TEXT["zh-TW"] = {
     "settings_tab": "設定",
     "font_tab": "文字大小",
     "display_tab": "介面語言",
+    "text_tab": "文字",
+    "direct_tab": "直譯",
     "swap_languages": "⇅ 交換語言",
     "copy_output": "複製譯文",
     "back_translation": "回翻譯",
@@ -1003,6 +1073,7 @@ DEFAULT_CONFIG = {
     "input_font_size": 13,
     "output_font_size": 13,
     "back_font_size": 11,
+    "window_size": "700x540",
 }
 
 
@@ -1042,6 +1113,7 @@ def load_config() -> dict:
             config[size_key] = min(32, max(8, int(config.get(size_key, default_size))))
         except (TypeError, ValueError):
             config[size_key] = default_size
+    config["window_size"] = normalize_window_size(config.get("window_size"), DEFAULT_CONFIG["window_size"])
     config["my_languages"] = normalize_language_list(config.get("my_languages"), DEFAULT_CONFIG["my_languages"])
     config["their_languages"] = normalize_language_list(config.get("their_languages"), DEFAULT_CONFIG["their_languages"])
 
@@ -1055,6 +1127,17 @@ def load_config() -> dict:
 def save_config(config: dict) -> None:
     with CONFIG_PATH.open("w", encoding="utf-8") as file:
         json.dump(config, file, ensure_ascii=False, indent=2)
+
+
+def normalize_window_size(value, fallback: str = "700x540") -> str:
+    if not isinstance(value, str):
+        return fallback
+    match = re.fullmatch(r"\s*(\d{3,4})x(\d{3,4})\s*", value)
+    if not match:
+        return fallback
+    width = max(330, min(2400, int(match.group(1))))
+    height = max(240, min(1800, int(match.group(2))))
+    return f"{width}x{height}"
 
 
 def normalize_language_list(value, fallback: list[str]) -> list[str]:
@@ -1622,7 +1705,11 @@ class TranslatorApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.config_data = load_config()
+        self.ui_language_var = tk.StringVar(
+            value=UI_LANGUAGE_NAMES.get(self.config_data.get("ui_language", "zh-CN"), "中文（简体）")
+        )
         self.result_queue: queue.Queue[tuple[str, TranslationResult | Exception]] = queue.Queue()
+        self.direct_event_queue: queue.Queue[int] = queue.Queue()
         self.translation_running = False
         self.speech_running = False
         self.speaking_running = False
@@ -1636,13 +1723,22 @@ class TranslatorApp(tk.Tk):
         self.external_focus_hwnd = None
         self.external_caret_point = None
         self.external_restore_topmost = False
+        self.direct_mode_enabled = False
+        self.direct_phase = "idle"
+        self.direct_enter_pending = False
+        self.direct_last_enter_at = 0.0
+        self.direct_translation_in_progress = False
+        self.direct_external_hwnd = None
+        self.keyboard_hook = None
+        self.keyboard_proc = None
+        self.own_root_hwnd = 0
         self.current_page = "translate"
         self.process_id = int(KERNEL32.GetCurrentProcessId()) if IS_WINDOWS and KERNEL32 is not None else 0
 
         self.title(self._ui("app_title"))
         self._apply_window_icon()
         self.minsize(330, 240)
-        self.geometry("700x540")
+        self.geometry(self.config_data.get("window_size", DEFAULT_CONFIG["window_size"]))
         self.configure(bg=BG)
         self._setup_fonts()
         self._setup_styles()
@@ -1650,13 +1746,16 @@ class TranslatorApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._build_ui()
+        self.own_root_hwnd = self._own_hwnd()
         self._refresh_language_bars()
         self._refresh_back_panel()
+        self._install_keyboard_hook()
         self.bind("<Configure>", self._on_window_resize)
         self.bind("<Return>", self._submit_from_keyboard)
         self.bind("<Control-Return>", self._submit_from_keyboard)
         self.after(250, self._track_foreground_window)
         self.after(100, self._poll_results)
+        self.after(50, self._poll_direct_events)
 
     def _apply_window_icon(self):
         icon_path = resource_path(APP_ICON)
@@ -1731,8 +1830,7 @@ class TranslatorApp(tk.Tk):
             (
                 ("translate", self._ui("translate_tab")),
                 ("settings", self._ui("settings_tab")),
-                ("font", self._ui("font_tab")),
-                ("display", self._ui("display_tab")),
+                ("text", self._ui("text_tab")),
             )
         ):
             button = tk.Button(
@@ -1752,6 +1850,22 @@ class TranslatorApp(tk.Tk):
             button.grid(row=0, column=column, sticky="w", padx=(0, 4))
             self.nav_buttons[page_name] = button
 
+        self.direct_button = tk.Button(
+            self.nav,
+            text=self._ui("direct_tab"),
+            width=9,
+            height=1,
+            relief="solid",
+            borderwidth=1,
+            cursor="hand2",
+            font=self._font_name("body_bold"),
+            fg=TEXT,
+            bg=PANEL,
+            activebackground="#eaf2ff",
+            command=self.toggle_direct_mode,
+        )
+        self.direct_button.grid(row=0, column=3, sticky="w", padx=(0, 4))
+
         self.page_host = ttk.Frame(self, style="App.TFrame")
         self.page_host.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 8))
         self.page_host.grid_rowconfigure(0, weight=1)
@@ -1759,36 +1873,55 @@ class TranslatorApp(tk.Tk):
 
         self.translate_page = ttk.Frame(self.page_host, style="App.TFrame")
         self.settings_page = ttk.Frame(self.page_host, style="App.TFrame")
-        self.font_page = ttk.Frame(self.page_host, style="App.TFrame")
-        self.display_page = ttk.Frame(self.page_host, style="App.TFrame")
-        for page in (self.translate_page, self.settings_page, self.font_page, self.display_page):
+        self.text_page = ttk.Frame(self.page_host, style="App.TFrame")
+        for page in (self.translate_page, self.settings_page, self.text_page):
             page.grid(row=0, column=0, sticky="nsew")
 
         self._build_translate_page()
         self._build_settings_page()
-        self._build_font_page()
-        self._build_display_page()
+        self._build_text_page()
         self.show_page("translate")
 
     def show_page(self, page_name: str):
         pages = {
             "translate": self.translate_page,
             "settings": self.settings_page,
-            "font": self.font_page,
-            "display": self.display_page,
+            "text": self.text_page,
         }
         self.current_page = page_name
         pages[page_name].tkraise()
         for name, button in self.nav_buttons.items():
             selected = name == page_name
             button.configure(bg="#eaf2ff" if selected else PANEL, fg=BLUE if selected else TEXT)
+        self._refresh_direct_button()
         if page_name == "translate":
             self.after_idle(self._focus_input_text_end)
+
+    def toggle_direct_mode(self):
+        if not IS_WINDOWS or USER32 is None or self.keyboard_hook is None:
+            self.status_var.set(self._ui("direct_unavailable"))
+            return
+        self.direct_mode_enabled = not self.direct_mode_enabled
+        self.direct_phase = "idle"
+        self.direct_translation_in_progress = False
+        self.ready_to_paste = False
+        self.ready_to_send_external = False
+        self._refresh_direct_button()
+        if self.direct_mode_enabled:
+            self.show_page("translate")
+        self.status_var.set(self._ui("direct_enabled" if self.direct_mode_enabled else "direct_disabled"))
+
+    def _refresh_direct_button(self):
+        if not hasattr(self, "direct_button"):
+            return
+        self.direct_button.configure(
+            bg="#eaf2ff" if self.direct_mode_enabled else PANEL,
+            fg=BLUE if self.direct_mode_enabled else TEXT,
+        )
 
     def _build_translate_page(self):
         page = self.translate_page
         page.grid_rowconfigure(0, weight=1)
-        page.grid_rowconfigure(1, weight=0)
         page.grid_columnconfigure(0, weight=1)
 
         self.translate_panes = tk.PanedWindow(
@@ -1800,7 +1933,7 @@ class TranslatorApp(tk.Tk):
             bg=BG,
             opaqueresize=True,
         )
-        self.translate_panes.grid(row=0, column=0, sticky="nsew", pady=(0, 6))
+        self.translate_panes.grid(row=0, column=0, sticky="nsew")
 
         self.source_panel = self._panel(self.translate_panes)
         self.source_panel.grid_rowconfigure(1, weight=1)
@@ -1844,6 +1977,14 @@ class TranslatorApp(tk.Tk):
             command=self.speak_input_text,
         )
         self.speak_input_button.grid(row=0, column=1, sticky="w", padx=(6, 0))
+        self.translate_button = ttk.Button(
+            source_audio,
+            text=self._ui("translate"),
+            width=6,
+            style="Small.TButton",
+            command=self._submit_from_keyboard,
+        )
+        self.translate_button.grid(row=0, column=2, sticky="w", padx=(6, 0))
         self.clear_input_button = ttk.Button(
             source_audio,
             text=self._ui("clear"),
@@ -1851,7 +1992,7 @@ class TranslatorApp(tk.Tk):
             style="Small.TButton",
             command=self.clear_texts,
         )
-        self.clear_input_button.grid(row=0, column=2, sticky="w", padx=(6, 0))
+        self.clear_input_button.grid(row=0, column=3, sticky="w", padx=(6, 0))
         self.swap_button = ttk.Button(
             source_audio,
             text=self._ui("swap_languages"),
@@ -1859,7 +2000,7 @@ class TranslatorApp(tk.Tk):
             style="Small.TButton",
             command=self.swap_languages,
         )
-        self.swap_button.grid(row=0, column=3, sticky="w", padx=(6, 0))
+        self.swap_button.grid(row=0, column=4, sticky="w", padx=(6, 0))
         self.translate_panes.add(self.source_panel, minsize=54)
 
         self.target_panel = self._panel(self.translate_panes)
@@ -1889,6 +2030,14 @@ class TranslatorApp(tk.Tk):
             command=self.speak_output_text,
         )
         self.speak_output_button.grid(row=0, column=0, sticky="w")
+        self.copy_output_button = ttk.Button(
+            target_audio,
+            text=self._ui("copy_output"),
+            width=8,
+            style="Small.TButton",
+            command=self.copy_output,
+        )
+        self.copy_output_button.grid(row=0, column=1, sticky="w", padx=(6, 0))
         self.translate_panes.add(self.target_panel, minsize=54)
 
         self.back_panel = self._panel(self.translate_panes)
@@ -1915,14 +2064,6 @@ class TranslatorApp(tk.Tk):
         self.back_panel_visible = True
         self.after(200, self._set_initial_pane_sizes)
 
-        actions = ttk.Frame(page, style="App.TFrame")
-        actions.grid(row=1, column=0, sticky="ew")
-        actions.grid_columnconfigure(0, weight=1)
-        self.translate_button = ttk.Button(actions, text=self._ui("translate"), style="Primary.TButton", command=self._submit_from_keyboard)
-        self.translate_button.grid(row=0, column=1, padx=(8, 0))
-        ttk.Button(actions, text=self._ui("copy_output"), command=self.copy_output).grid(row=0, column=2, padx=(8, 0))
-        ttk.Button(actions, text=self._ui("clear"), command=self.clear_texts).grid(row=0, column=3, padx=(8, 0))
-
     def _build_settings_page(self):
         scroller = ScrollableFrame(self.settings_page)
         scroller.grid(row=0, column=0, sticky="nsew")
@@ -1943,8 +2084,6 @@ class TranslatorApp(tk.Tk):
         ).grid(
             row=0, column=0, sticky="w", padx=18, pady=(16, 8)
         )
-        self.ui_language_var = tk.StringVar(value=UI_LANGUAGE_NAMES.get(self.config_data.get("ui_language", "zh-CN"), "中文（简体）"))
-        self._labeled_combo(top_panel, 1, self._ui("ui_language"), self.ui_language_var, UI_LANGUAGE_LABELS)
 
         engine_panel = self._panel(content)
         engine_panel.grid(row=1, column=0, sticky="ew", pady=(0, 12))
@@ -2107,9 +2246,10 @@ class TranslatorApp(tk.Tk):
         self.after_idle(self.my_picker._on_options_resize)
         self.after_idle(self.their_picker._on_options_resize)
 
-    def _build_font_page(self):
-        self.font_page.grid_columnconfigure(0, weight=1)
-        panel = self._panel(self.font_page)
+    def _build_text_page(self):
+        self.text_page.grid_columnconfigure(0, weight=1)
+
+        panel = self._panel(self.text_page)
         panel.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         panel.grid_columnconfigure(1, weight=1)
 
@@ -2132,24 +2272,22 @@ class TranslatorApp(tk.Tk):
         actions.grid_columnconfigure(0, weight=1)
         ttk.Button(actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1)
 
-    def _build_display_page(self):
-        self.display_page.grid_columnconfigure(0, weight=1)
-        panel = self._panel(self.display_page)
-        panel.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        panel.grid_columnconfigure(1, weight=1)
+        language_panel = self._panel(self.text_page)
+        language_panel.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        language_panel.grid_columnconfigure(1, weight=1)
 
-        ttk.Label(panel, text=self._ui("interface_language_title"), style="Section.TLabel").grid(
+        ttk.Label(language_panel, text=self._ui("interface_language_title"), style="Section.TLabel").grid(
             row=0, column=0, columnspan=2, sticky="w", padx=18, pady=(18, 6)
         )
-        ttk.Label(panel, text=self._ui("interface_language_hint"), style="Muted.TLabel").grid(
+        ttk.Label(language_panel, text=self._ui("interface_language_hint"), style="Muted.TLabel").grid(
             row=1, column=0, columnspan=2, sticky="w", padx=18, pady=(0, 12)
         )
-        self._labeled_combo(panel, 2, self._ui("ui_language"), self.ui_language_var, UI_LANGUAGE_LABELS)
+        self._labeled_combo(language_panel, 2, self._ui("ui_language"), self.ui_language_var, UI_LANGUAGE_LABELS)
 
-        actions = ttk.Frame(panel, style="Panel.TFrame")
-        actions.grid(row=3, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 18))
-        actions.grid_columnconfigure(0, weight=1)
-        ttk.Button(actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1)
+        language_actions = ttk.Frame(language_panel, style="Panel.TFrame")
+        language_actions.grid(row=3, column=0, columnspan=2, sticky="ew", padx=18, pady=(10, 18))
+        language_actions.grid_columnconfigure(0, weight=1)
+        ttk.Button(language_actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1)
 
     def _font_size_control(self, parent, row: int, label: str, variable: tk.IntVar):
         ttk.Label(parent, text=label, style="Label.TLabel").grid(row=row, column=0, sticky="w", padx=18, pady=8)
@@ -2241,6 +2379,208 @@ class TranslatorApp(tk.Tk):
             self.translate_panes.sash_place(1, 0, main_height * 2)
         except tk.TclError:
             pass
+
+    def _install_keyboard_hook(self):
+        if not IS_WINDOWS or USER32 is None or LOW_LEVEL_KEYBOARD_PROC is None:
+            return
+        try:
+            self.keyboard_proc = LOW_LEVEL_KEYBOARD_PROC(self._keyboard_hook_proc)
+            module_handle = KERNEL32.GetModuleHandleW(None)
+            self.keyboard_hook = USER32.SetWindowsHookExW(WH_KEYBOARD_LL, self.keyboard_proc, module_handle, 0)
+            if not self.keyboard_hook:
+                self.keyboard_proc = None
+        except Exception:
+            self.keyboard_hook = None
+            self.keyboard_proc = None
+
+    def _uninstall_keyboard_hook(self):
+        if not IS_WINDOWS or USER32 is None or not self.keyboard_hook:
+            return
+        try:
+            USER32.UnhookWindowsHookEx(self.keyboard_hook)
+        except Exception:
+            pass
+        self.keyboard_hook = None
+        self.keyboard_proc = None
+
+    def _keyboard_hook_proc(self, n_code, w_param, l_param):
+        try:
+            if (
+                n_code == HC_ACTION
+                and self.direct_mode_enabled
+                and int(w_param) in (WM_KEYDOWN, WM_SYSKEYDOWN)
+            ):
+                pointer_value = int(l_param) & ((1 << PTR_BITS) - 1)
+                event_ptr = ctypes.cast(ctypes.c_void_p(pointer_value), ctypes.POINTER(KBDLLHOOKSTRUCT))
+                info = event_ptr.contents
+                if info.vkCode == VK_RETURN and not (info.flags & LLKHF_INJECTED):
+                    hwnd = int(USER32.GetForegroundWindow())
+                    if self._is_valid_external_window_for_hook(hwnd):
+                        now = time.monotonic()
+                        if now - self.direct_last_enter_at < 0.18:
+                            return 1
+                        self.direct_last_enter_at = now
+                        if not self.direct_enter_pending:
+                            self.direct_enter_pending = True
+                            self.direct_event_queue.put(hwnd)
+                        return 1
+        except Exception:
+            pass
+        return USER32.CallNextHookEx(self.keyboard_hook, n_code, w_param, l_param)
+
+    def _poll_direct_events(self):
+        try:
+            while True:
+                hwnd = self.direct_event_queue.get_nowait()
+                self._handle_direct_enter(hwnd)
+        except queue.Empty:
+            pass
+        self.after(50, self._poll_direct_events)
+
+    def _is_valid_external_window_for_hook(self, hwnd) -> bool:
+        if not IS_WINDOWS or USER32 is None:
+            return False
+        try:
+            hwnd = int(hwnd or 0)
+        except (TypeError, ValueError):
+            return False
+        if hwnd == 0 or hwnd == int(self.own_root_hwnd or 0):
+            return False
+        if self._window_process_id(hwnd) == self.process_id:
+            return False
+        try:
+            return bool(USER32.IsWindow(hwnd) and USER32.IsWindowVisible(hwnd))
+        except Exception:
+            return False
+
+    def _handle_direct_enter(self, hwnd):
+        try:
+            if not self.direct_mode_enabled:
+                return
+            if not self._is_valid_external_window(hwnd):
+                self.status_var.set(self._ui("direct_unavailable"))
+                return
+            if self.translation_running or self.direct_phase == "translating":
+                self.status_var.set(self._ui("direct_waiting"))
+                return
+            if self.direct_phase == "translated":
+                self._replace_external_input_with_translation(hwnd)
+                return
+            if self.direct_phase == "pasted":
+                self._send_direct_external_message(hwnd)
+                return
+            self._start_direct_translation_from_external(hwnd)
+        finally:
+            self.direct_enter_pending = False
+
+    def _start_direct_translation_from_external(self, hwnd):
+        self.status_var.set(self._ui("direct_capturing"))
+        self.update_idletasks()
+        text = self._copy_external_input_text(hwnd)
+        if not text:
+            self.status_var.set(self._ui("direct_input_missing"))
+            return
+
+        self.direct_external_hwnd = hwnd
+        self.input_text.delete("1.0", "end")
+        self.input_text.insert("1.0", text)
+        self._set_text(self.output_text, "")
+        self._set_text(self.back_text, "")
+        self.direct_phase = "translating"
+        self.direct_translation_in_progress = True
+        self.status_var.set(self._ui("direct_captured"))
+        self.start_translation()
+        if not self.translation_running:
+            self.direct_phase = "idle"
+            self.direct_translation_in_progress = False
+
+    def _copy_external_input_text(self, hwnd) -> str:
+        try:
+            foreground = int(USER32.GetForegroundWindow()) if IS_WINDOWS and USER32 is not None else 0
+        except Exception:
+            foreground = 0
+        if foreground != int(hwnd) and not self._focus_external_window(hwnd):
+            return ""
+
+        self._remember_external_input_focus(hwnd)
+        had_clipboard_text = False
+        old_clipboard_text = None
+        try:
+            old_clipboard_text = self.clipboard_get()
+            had_clipboard_text = True
+        except tk.TclError:
+            pass
+
+        try:
+            self.clipboard_clear()
+            self.update()
+            time.sleep(0.14)
+            self._send_ctrl_key(VK_A)
+            time.sleep(0.1)
+            self._send_ctrl_key(VK_C)
+            for _ in range(10):
+                time.sleep(0.05)
+                self.update()
+                try:
+                    text = self.clipboard_get().strip()
+                    if text:
+                        return text
+                except tk.TclError:
+                    pass
+            return ""
+        finally:
+            self.after(300, lambda: self._restore_clipboard_text(old_clipboard_text, had_clipboard_text))
+
+    def _replace_external_input_with_translation(self, hwnd):
+        output = self._get_text(self.output_text)
+        if not output:
+            self.status_var.set(self._ui("no_output"))
+            return
+        hwnd = hwnd if self._is_valid_external_window(hwnd) else self.direct_external_hwnd
+        if not self._is_valid_external_window(hwnd) or not self._focus_external_window(hwnd):
+            self.status_var.set(self._ui("paste_failed"))
+            return
+
+        had_clipboard_text = False
+        old_clipboard_text = None
+        try:
+            old_clipboard_text = self.clipboard_get()
+            had_clipboard_text = True
+        except tk.TclError:
+            pass
+
+        self.clipboard_clear()
+        self.clipboard_append(output)
+        self.update()
+        time.sleep(0.12)
+        self._send_ctrl_key(VK_A)
+        time.sleep(0.08)
+        self._send_ctrl_v()
+        self.direct_external_hwnd = hwnd
+        self.direct_phase = "pasted"
+        self.after(900, lambda: self._restore_clipboard_text(old_clipboard_text, had_clipboard_text))
+        self.status_var.set(self._ui("direct_replaced"))
+
+    def _send_direct_external_message(self, hwnd):
+        hwnd = hwnd if self._is_valid_external_window(hwnd) else self.direct_external_hwnd
+        if not self._is_valid_external_window(hwnd) or not self._focus_external_window(hwnd):
+            self.status_var.set(self._ui("paste_failed"))
+            return
+        self.after(120, self._send_enter_key)
+        self.after(360, self._clear_after_direct_send)
+
+    def _clear_after_direct_send(self):
+        self.input_text.delete("1.0", "end")
+        self._set_text(self.output_text, "")
+        self._set_text(self.back_text, "")
+        self.direct_phase = "idle"
+        self.direct_translation_in_progress = False
+        self.direct_external_hwnd = None
+        self.pending_translation_source = ""
+        self.last_translation_source = ""
+        self.ready_to_paste = False
+        self.ready_to_send_external = False
+        self.status_var.set(self._ui("direct_sent"))
 
     def _own_hwnd(self):
         try:
@@ -2338,6 +2678,14 @@ class TranslatorApp(tk.Tk):
         USER32.keybd_event(VK_CONTROL, 0, 0, 0)
         USER32.keybd_event(VK_V, 0, 0, 0)
         USER32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+        USER32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+    def _send_ctrl_key(self, vk_code: int):
+        if not IS_WINDOWS or USER32 is None:
+            return
+        USER32.keybd_event(VK_CONTROL, 0, 0, 0)
+        USER32.keybd_event(vk_code, 0, 0, 0)
+        USER32.keybd_event(vk_code, 0, KEYEVENTF_KEYUP, 0)
         USER32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
     def _send_enter_key(self):
@@ -2699,6 +3047,23 @@ class TranslatorApp(tk.Tk):
             self._set_text(self.output_text, payload.text)
             self._set_text(self.back_text, payload.back_text)
             self.last_translation_source = self.pending_translation_source
+            if self.direct_translation_in_progress and self.direct_mode_enabled:
+                self.ready_to_paste = False
+                self.ready_to_send_external = False
+                self.direct_phase = "translated" if payload.text else "idle"
+                self.direct_translation_in_progress = False
+                if payload.text:
+                    self.status_var.set(self._ui("direct_ready"))
+                    self._replace_external_input_with_translation(self.direct_external_hwnd)
+                else:
+                    self.status_var.set(self._ui("no_output"))
+                self.external_send_hwnd = None
+                self.external_focus_hwnd = None
+                self.external_caret_point = None
+                self.external_restore_topmost = False
+                self.after(100, self._poll_results)
+                return
+            self.direct_translation_in_progress = False
             self.ready_to_paste = bool(payload.text)
             self.ready_to_send_external = False
             self.external_send_hwnd = None
@@ -2710,6 +3075,9 @@ class TranslatorApp(tk.Tk):
             else:
                 self.status_var.set(self._ui("done").format(provider=payload.provider))
         elif isinstance(payload, Exception):
+            self.direct_translation_in_progress = False
+            if self.direct_phase == "translating":
+                self.direct_phase = "idle"
             self.ready_to_paste = False
             self.ready_to_send_external = False
             self.external_send_hwnd = None
@@ -2909,6 +3277,9 @@ class TranslatorApp(tk.Tk):
         self.external_focus_hwnd = None
         self.external_caret_point = None
         self.external_restore_topmost = False
+        self.direct_phase = "idle"
+        self.direct_translation_in_progress = False
+        self.direct_external_hwnd = None
         self.pending_translation_source = ""
         self.last_translation_source = ""
         self.status_var.set(self._ui("cleared"))
@@ -2935,8 +3306,14 @@ class TranslatorApp(tk.Tk):
     def _on_close(self):
         try:
             self._sync_settings_from_widgets(validate=False)
+            self.update_idletasks()
+            self.config_data["window_size"] = normalize_window_size(
+                f"{self.winfo_width()}x{self.winfo_height()}",
+                self.config_data.get("window_size", DEFAULT_CONFIG["window_size"]),
+            )
             save_config(self.config_data)
         finally:
+            self._uninstall_keyboard_hook()
             self.destroy()
 
 
