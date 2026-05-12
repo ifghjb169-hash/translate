@@ -20,8 +20,8 @@ py -3 translator_app.py
 - 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
 - 构建方式：GitHub Actions tag push 触发
 - 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
-- 组织仓库 SHA256：发布后回填
-- 个人仓库 SHA256：发布后回填
+- 组织仓库 SHA256：`05868639472c69a4ca749c003c36981868258913a266ba7d2cf87fed8fdd66bb`
+- 个人仓库 SHA256：`e44e7633300b2b46e663500f6642243e8a2867947ae2a7aa57c2a851bb5280ba`
 
 验证方式：
 
