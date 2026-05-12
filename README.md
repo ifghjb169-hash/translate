@@ -12,29 +12,29 @@ py -3 translator_app.py
 
 ## 发布与验证
 
-当前发布版本：`v2.2.0`
+当前发布版本：`v2.2.1`
 
-- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v2.2.0
-- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v2.2.0
-- 构建产物：`AI-Translate-Assistant-v2.2.0-win-x64.zip`
+- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v2.2.1
+- 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v2.2.1
+- 构建产物：`AI-Translate-Assistant-v2.2.1-win-x64.zip`
 - 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
 - 构建方式：GitHub Actions tag push 触发
 - 构建证明：Release 产物由 GitHub Actions 上传，并通过 GitHub Attestation API 验证
-- 组织仓库 SHA256：`c97d913f0f77f5d7369f6d318d4439e4bc3f46735921fae5e62911886918e9d3`
-- 个人仓库 SHA256：`30b0be82fd0ba40330f7810e3e3b0b1c6778b0f26cb66e6f20c36c0fbf4ddc57`
+- 组织仓库 SHA256：发布后回填
+- 个人仓库 SHA256：发布后回填
 
 验证方式：
 
 ```powershell
 # 下载 Release 产物后计算 SHA256
-Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v2.2.0-win-x64.zip
+Get-FileHash -Algorithm SHA256 .\AI-Translate-Assistant-v2.2.1-win-x64.zip
 ```
 
 也可以使用 GitHub CLI 验证软件来源：
 
 ```bash
-gh attestation verify ./AI-Translate-Assistant-v2.2.0-win-x64.zip --repo secure-artifacts/translate
-gh attestation verify ./AI-Translate-Assistant-v2.2.0-win-x64.zip --repo ifghjb169-hash/translate
+gh attestation verify ./AI-Translate-Assistant-v2.2.1-win-x64.zip --repo secure-artifacts/translate
+gh attestation verify ./AI-Translate-Assistant-v2.2.1-win-x64.zip --repo ifghjb169-hash/translate
 ```
 
 ## 已实现功能
@@ -62,6 +62,7 @@ gh attestation verify ./AI-Translate-Assistant-v2.2.0-win-x64.zip --repo ifghjb1
 - 普通模式下，输入框按第一次 `Enter` 开始翻译；译文完成后，第二次 `Enter` 会把译文输入到最近一次获得焦点的外部窗口输入框里；第三次 `Enter` 会尝试发送外部消息并清空本软件输入框。
 - 输入框下方的“翻译”按钮与 `Enter` 使用相同流程；“复制译文”按钮位于译文框下方。
 - 开启“直译”后，在 Teams、Facebook、记事本等外部输入框中按第一次 `Enter` 会读取当前输入、翻译并自动用译文替换聊天框内容；第二次 `Enter` 会发送消息并清空本软件输入框。
+- 可使用同一个全局快捷键来回开启/关闭“直译”，默认是 `Ctrl+Alt+D`，也可以在设置页底部自定义。
 - 使用外部输入时，先点一下 FB、Teams、记事本等软件里的聊天框/输入框，再回到翻译软件输入并翻译；软件会记住那个外部窗口。
 - 按 `Shift+Enter` 可在输入框内换行。
 - 窗口可自由调整大小，最小尺寸已放宽到更窄的 `330x240`。

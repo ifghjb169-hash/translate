@@ -115,9 +115,12 @@ if IS_WINDOWS:
     GA_ROOT = 2
     GW_HWNDNEXT = 2
     VK_CONTROL = 0x11
+    VK_SHIFT = 0x10
     VK_RETURN = 0x0D
+    VK_MENU = 0x12
     VK_A = 0x41
     VK_C = 0x43
+    VK_D = 0x44
     VK_V = 0x56
     WH_KEYBOARD_LL = 13
     HC_ACTION = 0
@@ -135,6 +138,8 @@ if IS_WINDOWS:
     USER32.CallNextHookEx.restype = LRESULT
     USER32.UnhookWindowsHookEx.argtypes = [wintypes.HHOOK]
     USER32.UnhookWindowsHookEx.restype = wintypes.BOOL
+    USER32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+    USER32.GetAsyncKeyState.restype = ctypes.c_short
     KERNEL32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
     KERNEL32.GetModuleHandleW.restype = wintypes.HMODULE
 else:
@@ -144,9 +149,12 @@ else:
     GA_ROOT = 2
     GW_HWNDNEXT = 2
     VK_CONTROL = 0x11
+    VK_SHIFT = 0x10
     VK_RETURN = 0x0D
+    VK_MENU = 0x12
     VK_A = 0x41
     VK_C = 0x43
+    VK_D = 0x44
     VK_V = 0x56
     WH_KEYBOARD_LL = 13
     HC_ACTION = 0
@@ -157,6 +165,19 @@ else:
     MOUSEEVENTF_LEFTDOWN = 0x0002
     MOUSEEVENTF_LEFTUP = 0x0004
     LOW_LEVEL_KEYBOARD_PROC = None
+
+
+HOTKEY_KEY_TO_VK = {chr(code): code for code in range(ord("A"), ord("Z") + 1)}
+HOTKEY_KEY_TO_VK.update({str(number): ord(str(number)) for number in range(10)})
+HOTKEY_KEY_TO_VK.update({f"F{number}": 0x6F + number for number in range(1, 13)})
+HOTKEY_MODIFIER_VKS = {"Ctrl": VK_CONTROL, "Alt": VK_MENU, "Shift": VK_SHIFT}
+HOTKEY_MODIFIER_ALIASES = {
+    "CTRL": "Ctrl",
+    "CONTROL": "Ctrl",
+    "ALT": "Alt",
+    "SHIFT": "Shift",
+}
+HOTKEY_MODIFIER_ORDER = ("Ctrl", "Alt", "Shift")
 
 
 LANGUAGES = [
@@ -367,7 +388,12 @@ UI_TEXT = {
         "back_platform_setting": "回翻译平台",
         "back_yes": "是，显示回翻译小界面",
         "back_no": "否，不进行回翻译",
+        "direct_settings": "直译设置",
+        "direct_hotkey_setting": "直译快捷键",
+        "direct_hotkey_help": "同一个快捷键可来回开启/关闭直译。格式示例：Ctrl+Alt+D、Ctrl+Shift+T、Alt+Q。支持 Ctrl / Alt / Shift 加字母、数字或 F1-F12。",
+        "direct_hotkey_invalid": "直译快捷键格式不正确，请使用类似 Ctrl+Alt+D 的格式。",
         "save_settings": "保存设置",
+        "settings_error": "设置错误",
         "text_size_title": "翻译框文字大小",
         "interface_language_title": "软件界面显示语言",
         "interface_language_hint": "选择软件菜单、按钮和提示使用的语言。保存后重启软件会完整生效。",
@@ -390,8 +416,9 @@ UI_TEXT = {
         "copied": "译文已复制",
         "pasted_external": "译文已输入到外部窗口",
         "sent_external": "译文已发送到外部窗口，输入框已清空",
-        "direct_enabled": "直译已开启：在聊天输入框按 Enter 会翻译并替换",
-        "direct_disabled": "直译已关闭",
+        "direct_enabled": "直译已开启：在聊天输入框按 Enter 会翻译并替换；快捷键 {hotkey}",
+        "direct_disabled": "直译已关闭；快捷键 {hotkey}",
+        "direct_hotkey": "直译快捷键：{hotkey}",
         "direct_unavailable": "直译只支持 Windows 外部输入窗口",
         "direct_capturing": "正在读取聊天输入...",
         "direct_captured": "已读取外部输入，正在直译...",
@@ -448,7 +475,12 @@ UI_TEXT = {
         "back_platform_setting": "Back-translation platform",
         "back_yes": "Yes, show the back-translation box",
         "back_no": "No, do not back-translate",
+        "direct_settings": "Direct Mode Settings",
+        "direct_hotkey_setting": "Direct shortcut",
+        "direct_hotkey_help": "Use the same shortcut to turn Direct mode on or off. Examples: Ctrl+Alt+D, Ctrl+Shift+T, Alt+Q. Supports Ctrl / Alt / Shift plus letters, digits, or F1-F12.",
+        "direct_hotkey_invalid": "Invalid direct shortcut. Use a format such as Ctrl+Alt+D.",
         "save_settings": "Save Settings",
+        "settings_error": "Settings Error",
         "text_size_title": "Translation Box Text Size",
         "interface_language_title": "Interface Language",
         "interface_language_hint": "Choose the language used by menus, buttons, and messages. Restart the app for the full interface to refresh.",
@@ -471,8 +503,9 @@ UI_TEXT = {
         "copied": "Translation copied",
         "pasted_external": "Translation pasted into the external window",
         "sent_external": "Translation sent to the external window; input cleared",
-        "direct_enabled": "Direct mode is on: Enter in the chat input translates and replaces",
-        "direct_disabled": "Direct mode is off",
+        "direct_enabled": "Direct mode is on: Enter in the chat input translates and replaces; shortcut {hotkey}",
+        "direct_disabled": "Direct mode is off; shortcut {hotkey}",
+        "direct_hotkey": "Direct shortcut: {hotkey}",
         "direct_unavailable": "Direct mode only supports Windows external input windows",
         "direct_capturing": "Reading the chat input...",
         "direct_captured": "External input captured, translating...",
@@ -561,6 +594,10 @@ UI_TEXT["zh-TW"] = {
     "display_tab": "介面語言",
     "text_tab": "文字",
     "direct_tab": "直譯",
+    "direct_settings": "直譯設定",
+    "direct_hotkey_setting": "直譯快速鍵",
+    "direct_hotkey_help": "同一個快速鍵可來回開啟/關閉直譯。格式範例：Ctrl+Alt+D、Ctrl+Shift+T、Alt+Q。支援 Ctrl / Alt / Shift 加字母、數字或 F1-F12。",
+    "direct_hotkey_invalid": "直譯快速鍵格式不正確，請使用類似 Ctrl+Alt+D 的格式。",
     "swap_languages": "⇅ 交換語言",
     "copy_output": "複製譯文",
     "back_translation": "回翻譯",
@@ -1074,6 +1111,7 @@ DEFAULT_CONFIG = {
     "output_font_size": 13,
     "back_font_size": 11,
     "window_size": "700x540",
+    "direct_hotkey": "Ctrl+Alt+D",
 }
 
 
@@ -1114,6 +1152,7 @@ def load_config() -> dict:
         except (TypeError, ValueError):
             config[size_key] = default_size
     config["window_size"] = normalize_window_size(config.get("window_size"), DEFAULT_CONFIG["window_size"])
+    config["direct_hotkey"] = normalize_direct_hotkey(config.get("direct_hotkey"), DEFAULT_CONFIG["direct_hotkey"])
     config["my_languages"] = normalize_language_list(config.get("my_languages"), DEFAULT_CONFIG["my_languages"])
     config["their_languages"] = normalize_language_list(config.get("their_languages"), DEFAULT_CONFIG["their_languages"])
 
@@ -1138,6 +1177,43 @@ def normalize_window_size(value, fallback: str = "700x540") -> str:
     width = max(330, min(2400, int(match.group(1))))
     height = max(240, min(1800, int(match.group(2))))
     return f"{width}x{height}"
+
+
+def parse_direct_hotkey(value) -> tuple[tuple[str, ...], int, str] | None:
+    if not isinstance(value, str):
+        return None
+    parts = [part.strip() for part in value.split("+") if part.strip()]
+    if len(parts) < 2:
+        return None
+
+    modifiers: set[str] = set()
+    key_name = ""
+    for part in parts:
+        token = part.upper()
+        if token in HOTKEY_MODIFIER_ALIASES:
+            modifiers.add(HOTKEY_MODIFIER_ALIASES[token])
+            continue
+        if key_name:
+            return None
+        if token in HOTKEY_KEY_TO_VK:
+            key_name = token
+        else:
+            return None
+
+    if not modifiers or not key_name:
+        return None
+
+    ordered_modifiers = tuple(modifier for modifier in HOTKEY_MODIFIER_ORDER if modifier in modifiers)
+    label = "+".join((*ordered_modifiers, key_name))
+    return ordered_modifiers, HOTKEY_KEY_TO_VK[key_name], label
+
+
+def normalize_direct_hotkey(value, fallback: str = "Ctrl+Alt+D") -> str:
+    parsed = parse_direct_hotkey(value)
+    if parsed:
+        return parsed[2]
+    fallback_parsed = parse_direct_hotkey(fallback)
+    return fallback_parsed[2] if fallback_parsed else "Ctrl+Alt+D"
 
 
 def normalize_language_list(value, fallback: list[str]) -> list[str]:
@@ -1709,7 +1785,7 @@ class TranslatorApp(tk.Tk):
             value=UI_LANGUAGE_NAMES.get(self.config_data.get("ui_language", "zh-CN"), "中文（简体）")
         )
         self.result_queue: queue.Queue[tuple[str, TranslationResult | Exception]] = queue.Queue()
-        self.direct_event_queue: queue.Queue[int] = queue.Queue()
+        self.direct_event_queue: queue.Queue[tuple[str, int]] = queue.Queue()
         self.translation_running = False
         self.speech_running = False
         self.speaking_running = False
@@ -1726,12 +1802,18 @@ class TranslatorApp(tk.Tk):
         self.direct_mode_enabled = False
         self.direct_phase = "idle"
         self.direct_enter_pending = False
+        self.direct_toggle_pending = False
         self.direct_last_enter_at = 0.0
+        self.direct_last_toggle_at = 0.0
         self.direct_translation_in_progress = False
         self.direct_external_hwnd = None
         self.keyboard_hook = None
         self.keyboard_proc = None
         self.own_root_hwnd = 0
+        self.direct_hotkey_modifiers = ()
+        self.direct_hotkey_vk = VK_D
+        self.direct_hotkey_label = DEFAULT_CONFIG["direct_hotkey"]
+        self._apply_direct_hotkey(self.config_data.get("direct_hotkey", DEFAULT_CONFIG["direct_hotkey"]))
         self.current_page = "translate"
         self.process_id = int(KERNEL32.GetCurrentProcessId()) if IS_WINDOWS and KERNEL32 is not None else 0
 
@@ -1909,7 +1991,11 @@ class TranslatorApp(tk.Tk):
         self._refresh_direct_button()
         if self.direct_mode_enabled:
             self.show_page("translate")
-        self.status_var.set(self._ui("direct_enabled" if self.direct_mode_enabled else "direct_disabled"))
+        self.status_var.set(
+            self._ui("direct_enabled" if self.direct_mode_enabled else "direct_disabled").format(
+                hotkey=self.direct_hotkey_label
+            )
+        )
 
     def _refresh_direct_button(self):
         if not hasattr(self, "direct_button"):
@@ -1918,6 +2004,16 @@ class TranslatorApp(tk.Tk):
             bg="#eaf2ff" if self.direct_mode_enabled else PANEL,
             fg=BLUE if self.direct_mode_enabled else TEXT,
         )
+
+    def _apply_direct_hotkey(self, value: str):
+        normalized = normalize_direct_hotkey(value, DEFAULT_CONFIG["direct_hotkey"])
+        modifiers, vk_code, label = parse_direct_hotkey(normalized) or parse_direct_hotkey(DEFAULT_CONFIG["direct_hotkey"])
+        self.direct_hotkey_modifiers = modifiers
+        self.direct_hotkey_vk = vk_code
+        self.direct_hotkey_label = label
+        self.config_data["direct_hotkey"] = label
+        if hasattr(self, "direct_hotkey_var"):
+            self.direct_hotkey_var.set(label)
 
     def _build_translate_page(self):
         page = self.translate_page
@@ -2207,8 +2303,20 @@ class TranslatorApp(tk.Tk):
             row=7, column=1, sticky="w", padx=12, pady=(0, 18)
         )
 
+        direct_panel = self._panel(content)
+        direct_panel.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+        direct_panel.grid_columnconfigure(1, weight=1)
+        ttk.Label(direct_panel, text=self._ui("direct_settings"), style="Section.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=18, pady=(18, 12)
+        )
+        self.direct_hotkey_var = tk.StringVar(value=self.config_data.get("direct_hotkey", DEFAULT_CONFIG["direct_hotkey"]))
+        self._labeled_entry(direct_panel, 1, self._ui("direct_hotkey_setting"), self.direct_hotkey_var, DEFAULT_CONFIG["direct_hotkey"])
+        ttk.Label(direct_panel, text=self._ui("direct_hotkey_help"), style="Muted.TLabel").grid(
+            row=2, column=1, sticky="w", padx=12, pady=(0, 18)
+        )
+
         actions = ttk.Frame(content, style="App.TFrame")
-        actions.grid(row=4, column=0, sticky="ew", pady=(0, 24))
+        actions.grid(row=5, column=0, sticky="ew", pady=(0, 24))
         actions.grid_columnconfigure(0, weight=1)
         ttk.Button(actions, text=self._ui("save_settings"), style="Primary.TButton", command=self.save_settings).grid(row=0, column=1, padx=(8, 0))
         self._refresh_translation_method_visibility()
@@ -2407,32 +2515,57 @@ class TranslatorApp(tk.Tk):
         try:
             if (
                 n_code == HC_ACTION
-                and self.direct_mode_enabled
                 and int(w_param) in (WM_KEYDOWN, WM_SYSKEYDOWN)
             ):
                 pointer_value = int(l_param) & ((1 << PTR_BITS) - 1)
                 event_ptr = ctypes.cast(ctypes.c_void_p(pointer_value), ctypes.POINTER(KBDLLHOOKSTRUCT))
                 info = event_ptr.contents
+                if not (info.flags & LLKHF_INJECTED) and self._direct_hotkey_pressed(info.vkCode):
+                    now = time.monotonic()
+                    if now - self.direct_last_toggle_at < 0.6:
+                        return 1
+                    self.direct_last_toggle_at = now
+                    if not self.direct_toggle_pending:
+                        self.direct_toggle_pending = True
+                        self.direct_event_queue.put(("toggle", 0))
+                    return 1
                 if info.vkCode == VK_RETURN and not (info.flags & LLKHF_INJECTED):
                     hwnd = int(USER32.GetForegroundWindow())
-                    if self._is_valid_external_window_for_hook(hwnd):
+                    if self.direct_mode_enabled and self._is_valid_external_window_for_hook(hwnd):
                         now = time.monotonic()
                         if now - self.direct_last_enter_at < 0.18:
                             return 1
                         self.direct_last_enter_at = now
                         if not self.direct_enter_pending:
                             self.direct_enter_pending = True
-                            self.direct_event_queue.put(hwnd)
+                            self.direct_event_queue.put(("enter", hwnd))
                         return 1
         except Exception:
             pass
         return USER32.CallNextHookEx(self.keyboard_hook, n_code, w_param, l_param)
 
+    def _direct_hotkey_pressed(self, vk_code: int) -> bool:
+        if not IS_WINDOWS or USER32 is None:
+            return False
+        try:
+            if int(vk_code) != int(self.direct_hotkey_vk):
+                return False
+            return all(
+                USER32.GetAsyncKeyState(HOTKEY_MODIFIER_VKS[modifier]) & 0x8000
+                for modifier in self.direct_hotkey_modifiers
+            )
+        except Exception:
+            return False
+
     def _poll_direct_events(self):
         try:
             while True:
-                hwnd = self.direct_event_queue.get_nowait()
-                self._handle_direct_enter(hwnd)
+                event_type, hwnd = self.direct_event_queue.get_nowait()
+                if event_type == "toggle":
+                    self.direct_toggle_pending = False
+                    self.toggle_direct_mode()
+                elif event_type == "enter":
+                    self._handle_direct_enter(hwnd)
         except queue.Empty:
             pass
         self.after(50, self._poll_direct_events)
@@ -2880,6 +3013,14 @@ class TranslatorApp(tk.Tk):
         input_font_size = self._safe_font_size(self.input_font_size_var, self.config_data.get("input_font_size", 13))
         output_font_size = self._safe_font_size(self.output_font_size_var, self.config_data.get("output_font_size", 13))
         back_font_size = self._safe_font_size(self.back_font_size_var, self.config_data.get("back_font_size", 11))
+        raw_direct_hotkey = self.direct_hotkey_var.get().strip() if hasattr(self, "direct_hotkey_var") else DEFAULT_CONFIG["direct_hotkey"]
+        parsed_direct_hotkey = parse_direct_hotkey(raw_direct_hotkey)
+        if not parsed_direct_hotkey:
+            if validate:
+                messagebox.showerror(self._ui("settings_error"), self._ui("direct_hotkey_invalid"))
+                return False
+            parsed_direct_hotkey = parse_direct_hotkey(DEFAULT_CONFIG["direct_hotkey"])
+        direct_hotkey = parsed_direct_hotkey[2]
 
         self.config_data.update(
             {
@@ -2904,8 +3045,10 @@ class TranslatorApp(tk.Tk):
                 "input_font_size": input_font_size,
                 "output_font_size": output_font_size,
                 "back_font_size": back_font_size,
+                "direct_hotkey": direct_hotkey,
             }
         )
+        self._apply_direct_hotkey(direct_hotkey)
 
         if self.config_data.get("source_lang") not in self.config_data["my_languages"]:
             self.config_data["source_lang"] = self.config_data["my_languages"][0]
