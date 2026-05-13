@@ -38,6 +38,19 @@ def resource_path(name: str) -> Path:
 
 
 CONFIG_PATH = app_base_dir() / "translator_config.json"
+FLOAT_TRANSPARENT_COLOR = "#ff00ff"
+FLOAT_ACTIVE_COLOR = "#cfefff"
+FLOAT_BORDER_COLOR = "#6aaed6"
+FLOAT_INACTIVE_BORDER = "#8a96a6"
+FLOAT_COLOR_PRESETS = {
+    "blue": ("#cfefff", "color_preset_blue"),
+    "green": ("#c8f7d4", "color_preset_green"),
+    "purple": ("#e8ddff", "color_preset_purple"),
+    "yellow": ("#fff2a8", "color_preset_yellow"),
+    "pink": ("#ffd6ea", "color_preset_pink"),
+    "white": ("#ffffff", "color_preset_white"),
+    "custom": ("", "color_preset_custom"),
+}
 
 SPEECH_CULTURES = {
     "zh-CN": "zh-CN",
@@ -389,9 +402,22 @@ UI_TEXT = {
         "back_yes": "是，显示回翻译小界面",
         "back_no": "否，不进行回翻译",
         "direct_settings": "直译设置",
-        "direct_hotkey_setting": "直译快捷键",
-        "direct_hotkey_help": "同一个快捷键可来回开启/关闭直译。格式示例：Ctrl+Alt+D、Ctrl+Shift+T、Alt+Q。支持 Ctrl / Alt / Shift 加字母、数字或 F1-F12。",
-        "direct_hotkey_invalid": "直译快捷键格式不正确，请使用类似 Ctrl+Alt+D 的格式。",
+        "direct_hotkey_setting": "启动直译快捷键",
+        "direct_hotkey_help": "同一个快捷键可来回开启/关闭直译。格式示例：Alt+Q、Ctrl+Shift+T、Ctrl+Alt+D。支持 Ctrl / Alt / Shift 加字母、数字或 F1-F12。",
+        "direct_hotkey_invalid": "直译快捷键格式不正确，请使用类似 Alt+Q 的格式。",
+        "floating_button_size": "悬浮按钮大小",
+        "floating_button_size_help": "最小化后的圆形按钮大小，可按需要调小或调大。",
+        "floating_button_color_preset": "亮起颜色预设",
+        "floating_button_custom_color": "自定义颜色代码",
+        "floating_button_color_help": "选择预设颜色，或选择“自定义”并输入 #RRGGBB 颜色代码。",
+        "floating_button_color_invalid": "自定义颜色代码不正确，请使用类似 #cfefff 的格式。",
+        "color_preset_blue": "浅蓝",
+        "color_preset_green": "绿色",
+        "color_preset_purple": "紫色",
+        "color_preset_yellow": "黄色",
+        "color_preset_pink": "粉色",
+        "color_preset_white": "白色",
+        "color_preset_custom": "自定义",
         "save_settings": "保存设置",
         "settings_error": "设置错误",
         "text_size_title": "翻译框文字大小",
@@ -476,9 +502,22 @@ UI_TEXT = {
         "back_yes": "Yes, show the back-translation box",
         "back_no": "No, do not back-translate",
         "direct_settings": "Direct Mode Settings",
-        "direct_hotkey_setting": "Direct shortcut",
-        "direct_hotkey_help": "Use the same shortcut to turn Direct mode on or off. Examples: Ctrl+Alt+D, Ctrl+Shift+T, Alt+Q. Supports Ctrl / Alt / Shift plus letters, digits, or F1-F12.",
-        "direct_hotkey_invalid": "Invalid direct shortcut. Use a format such as Ctrl+Alt+D.",
+        "direct_hotkey_setting": "Direct mode shortcut",
+        "direct_hotkey_help": "Use the same shortcut to turn Direct mode on or off. Examples: Alt+Q, Ctrl+Shift+T, Ctrl+Alt+D. Supports Ctrl / Alt / Shift plus letters, digits, or F1-F12.",
+        "direct_hotkey_invalid": "Invalid direct shortcut. Use a format such as Alt+Q.",
+        "floating_button_size": "Floating button size",
+        "floating_button_size_help": "Adjust the circular button shown when the app is minimized.",
+        "floating_button_color_preset": "Active color preset",
+        "floating_button_custom_color": "Custom color code",
+        "floating_button_color_help": "Choose a preset, or choose Custom and enter a #RRGGBB color code.",
+        "floating_button_color_invalid": "Invalid custom color code. Use a format like #cfefff.",
+        "color_preset_blue": "Light blue",
+        "color_preset_green": "Green",
+        "color_preset_purple": "Purple",
+        "color_preset_yellow": "Yellow",
+        "color_preset_pink": "Pink",
+        "color_preset_white": "White",
+        "color_preset_custom": "Custom",
         "save_settings": "Save Settings",
         "settings_error": "Settings Error",
         "text_size_title": "Translation Box Text Size",
@@ -595,9 +634,22 @@ UI_TEXT["zh-TW"] = {
     "text_tab": "文字",
     "direct_tab": "直譯",
     "direct_settings": "直譯設定",
-    "direct_hotkey_setting": "直譯快速鍵",
-    "direct_hotkey_help": "同一個快速鍵可來回開啟/關閉直譯。格式範例：Ctrl+Alt+D、Ctrl+Shift+T、Alt+Q。支援 Ctrl / Alt / Shift 加字母、數字或 F1-F12。",
-    "direct_hotkey_invalid": "直譯快速鍵格式不正確，請使用類似 Ctrl+Alt+D 的格式。",
+    "direct_hotkey_setting": "啟動直譯快速鍵",
+    "direct_hotkey_help": "同一個快速鍵可來回開啟/關閉直譯。格式範例：Alt+Q、Ctrl+Shift+T、Ctrl+Alt+D。支援 Ctrl / Alt / Shift 加字母、數字或 F1-F12。",
+    "direct_hotkey_invalid": "直譯快速鍵格式不正確，請使用類似 Alt+Q 的格式。",
+    "floating_button_size": "懸浮按鈕大小",
+    "floating_button_size_help": "最小化後的圓形按鈕大小，可依需要調小或調大。",
+    "floating_button_color_preset": "亮起顏色預設",
+    "floating_button_custom_color": "自訂顏色代碼",
+    "floating_button_color_help": "選擇預設顏色，或選擇「自訂」並輸入 #RRGGBB 顏色代碼。",
+    "floating_button_color_invalid": "自訂顏色代碼不正確，請使用類似 #cfefff 的格式。",
+    "color_preset_blue": "淺藍",
+    "color_preset_green": "綠色",
+    "color_preset_purple": "紫色",
+    "color_preset_yellow": "黃色",
+    "color_preset_pink": "粉色",
+    "color_preset_white": "白色",
+    "color_preset_custom": "自訂",
     "swap_languages": "⇅ 交換語言",
     "copy_output": "複製譯文",
     "back_translation": "回翻譯",
@@ -1111,7 +1163,11 @@ DEFAULT_CONFIG = {
     "output_font_size": 13,
     "back_font_size": 11,
     "window_size": "700x540",
-    "direct_hotkey": "Ctrl+Alt+D",
+    "direct_hotkey": "Alt+Q",
+    "floating_position": "",
+    "floating_button_size": 54,
+    "floating_active_color_preset": "blue",
+    "floating_active_color": FLOAT_ACTIVE_COLOR,
 }
 
 
@@ -1152,7 +1208,25 @@ def load_config() -> dict:
         except (TypeError, ValueError):
             config[size_key] = default_size
     config["window_size"] = normalize_window_size(config.get("window_size"), DEFAULT_CONFIG["window_size"])
-    config["direct_hotkey"] = normalize_direct_hotkey(config.get("direct_hotkey"), DEFAULT_CONFIG["direct_hotkey"])
+    raw_direct_hotkey = config.get("direct_hotkey")
+    if raw_direct_hotkey in (None, "", "Ctrl+Alt+D"):
+        raw_direct_hotkey = DEFAULT_CONFIG["direct_hotkey"]
+    elif normalize_direct_hotkey(raw_direct_hotkey, DEFAULT_CONFIG["direct_hotkey"]) == "Ctrl+Alt+D":
+        raw_direct_hotkey = DEFAULT_CONFIG["direct_hotkey"]
+    config["direct_hotkey"] = normalize_direct_hotkey(raw_direct_hotkey, DEFAULT_CONFIG["direct_hotkey"])
+    config["floating_button_size"] = normalize_floating_button_size(
+        config.get("floating_button_size"), DEFAULT_CONFIG["floating_button_size"]
+    )
+    color_preset = config.get("floating_active_color_preset")
+    if color_preset not in FLOAT_COLOR_PRESETS:
+        color_preset = DEFAULT_CONFIG["floating_active_color_preset"]
+    config["floating_active_color_preset"] = color_preset
+    if color_preset == "custom":
+        config["floating_active_color"] = normalize_hex_color(
+            config.get("floating_active_color"), DEFAULT_CONFIG["floating_active_color"]
+        )
+    else:
+        config["floating_active_color"] = FLOAT_COLOR_PRESETS[color_preset][0]
     config["my_languages"] = normalize_language_list(config.get("my_languages"), DEFAULT_CONFIG["my_languages"])
     config["their_languages"] = normalize_language_list(config.get("their_languages"), DEFAULT_CONFIG["their_languages"])
 
@@ -1177,6 +1251,35 @@ def normalize_window_size(value, fallback: str = "700x540") -> str:
     width = max(330, min(2400, int(match.group(1))))
     height = max(240, min(1800, int(match.group(2))))
     return f"{width}x{height}"
+
+
+def normalize_floating_button_size(value, fallback: int = 54) -> int:
+    try:
+        return min(120, max(36, int(value)))
+    except (TypeError, ValueError):
+        return fallback
+
+
+def normalize_hex_color(value, fallback: str = FLOAT_ACTIVE_COLOR) -> str:
+    if not isinstance(value, str):
+        return fallback
+    color = value.strip()
+    if not color:
+        return fallback
+    if not color.startswith("#"):
+        color = f"#{color}"
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+        return color.lower()
+    return fallback
+
+
+def is_hex_color(value) -> bool:
+    if not isinstance(value, str):
+        return False
+    color = value.strip()
+    if not color.startswith("#"):
+        color = f"#{color}"
+    return bool(re.fullmatch(r"#[0-9a-fA-F]{6}", color))
 
 
 def parse_direct_hotkey(value) -> tuple[tuple[str, ...], int, str] | None:
@@ -1208,12 +1311,12 @@ def parse_direct_hotkey(value) -> tuple[tuple[str, ...], int, str] | None:
     return ordered_modifiers, HOTKEY_KEY_TO_VK[key_name], label
 
 
-def normalize_direct_hotkey(value, fallback: str = "Ctrl+Alt+D") -> str:
+def normalize_direct_hotkey(value, fallback: str = "Alt+Q") -> str:
     parsed = parse_direct_hotkey(value)
     if parsed:
         return parsed[2]
     fallback_parsed = parse_direct_hotkey(fallback)
-    return fallback_parsed[2] if fallback_parsed else "Ctrl+Alt+D"
+    return fallback_parsed[2] if fallback_parsed else "Alt+Q"
 
 
 def normalize_language_list(value, fallback: list[str]) -> list[str]:
@@ -1811,8 +1914,12 @@ class TranslatorApp(tk.Tk):
         self.keyboard_proc = None
         self.own_root_hwnd = 0
         self.direct_hotkey_modifiers = ()
-        self.direct_hotkey_vk = VK_D
+        self.direct_hotkey_vk = HOTKEY_KEY_TO_VK.get("Q", VK_D)
         self.direct_hotkey_label = DEFAULT_CONFIG["direct_hotkey"]
+        self.floating_toggle = None
+        self.floating_canvas = None
+        self.floating_drag = None
+        self.direct_hotkey_poll_pressed = False
         self._apply_direct_hotkey(self.config_data.get("direct_hotkey", DEFAULT_CONFIG["direct_hotkey"]))
         self.current_page = "translate"
         self.process_id = int(KERNEL32.GetCurrentProcessId()) if IS_WINDOWS and KERNEL32 is not None else 0
@@ -1833,11 +1940,14 @@ class TranslatorApp(tk.Tk):
         self._refresh_back_panel()
         self._install_keyboard_hook()
         self.bind("<Configure>", self._on_window_resize)
+        self.bind("<Unmap>", self._on_window_unmap)
+        self.bind("<Map>", self._on_window_map)
         self.bind("<Return>", self._submit_from_keyboard)
         self.bind("<Control-Return>", self._submit_from_keyboard)
         self.after(250, self._track_foreground_window)
         self.after(100, self._poll_results)
         self.after(50, self._poll_direct_events)
+        self.after(80, self._poll_direct_hotkey_state)
 
     def _apply_window_icon(self):
         icon_path = resource_path(APP_ICON)
@@ -1847,6 +1957,322 @@ class TranslatorApp(tk.Tk):
             self.iconbitmap(default=str(icon_path))
         except tk.TclError:
             pass
+
+    def _floating_button_size(self) -> int:
+        return normalize_floating_button_size(
+            self.config_data.get("floating_button_size"), DEFAULT_CONFIG["floating_button_size"]
+        )
+
+    def _floating_active_color(self) -> str:
+        preset = self.config_data.get("floating_active_color_preset", DEFAULT_CONFIG["floating_active_color_preset"])
+        if preset in FLOAT_COLOR_PRESETS and preset != "custom":
+            return FLOAT_COLOR_PRESETS[preset][0]
+        return normalize_hex_color(
+            self.config_data.get("floating_active_color"),
+            DEFAULT_CONFIG["floating_active_color"],
+        )
+
+    def _color_preset_label(self, preset_key: str) -> str:
+        _color, ui_key = FLOAT_COLOR_PRESETS.get(preset_key, FLOAT_COLOR_PRESETS["blue"])
+        return self._ui(ui_key)
+
+    def _color_preset_options(self) -> list[str]:
+        return [self._color_preset_label(key) for key in FLOAT_COLOR_PRESETS]
+
+    def _color_preset_key_from_label(self, label: str) -> str:
+        for key in FLOAT_COLOR_PRESETS:
+            if label == self._color_preset_label(key):
+                return key
+        return DEFAULT_CONFIG["floating_active_color_preset"]
+
+    def _on_window_unmap(self, event):
+        if event.widget is self:
+            self.after(120, self._show_floating_toggle_if_minimized)
+
+    def _on_window_map(self, event):
+        if event.widget is self:
+            self.after(120, self._hide_floating_toggle_if_restored)
+
+    def _show_floating_toggle_if_minimized(self):
+        try:
+            if self.state() == "iconic":
+                self._show_floating_toggle()
+        except tk.TclError:
+            pass
+
+    def _hide_floating_toggle_if_restored(self):
+        try:
+            if self.state() != "iconic":
+                self._hide_floating_toggle()
+        except tk.TclError:
+            pass
+
+    def _show_floating_toggle(self):
+        if self.floating_toggle is not None:
+            try:
+                if self.floating_toggle.winfo_exists():
+                    self._position_floating_toggle()
+                    self.floating_toggle.update_idletasks()
+                    self._refresh_floating_toggle()
+                    self.floating_toggle.deiconify()
+                    self.floating_toggle.lift()
+                    return
+            except tk.TclError:
+                self.floating_toggle = None
+                self.floating_canvas = None
+
+        top = tk.Toplevel(self)
+        self.floating_toggle = top
+        top.overrideredirect(True)
+        top.configure(bg=FLOAT_TRANSPARENT_COLOR)
+        try:
+            top.attributes("-topmost", True)
+            top.attributes("-transparentcolor", FLOAT_TRANSPARENT_COLOR)
+        except tk.TclError:
+            pass
+        try:
+            top.iconbitmap(default=str(resource_path(APP_ICON)))
+        except tk.TclError:
+            pass
+
+        size = self._floating_button_size()
+        canvas = tk.Canvas(
+            top,
+            width=size,
+            height=size,
+            bg=FLOAT_TRANSPARENT_COLOR,
+            highlightthickness=0,
+            bd=0,
+            cursor="hand2",
+        )
+        canvas.pack()
+        for widget in (canvas, top):
+            widget.bind("<ButtonPress-1>", self._floating_button_press)
+            widget.bind("<B1-Motion>", self._floating_button_drag)
+            widget.bind("<ButtonRelease-1>", self._floating_button_release)
+        self.floating_canvas = canvas
+        self._position_floating_toggle()
+        top.update_idletasks()
+        self._refresh_floating_toggle()
+
+    def _clamp_floating_position(self, x: int, y: int, size: int | None = None) -> tuple[int, int]:
+        if self.floating_toggle is None:
+            return x, y
+        size = size if size is not None else self._floating_button_size()
+        try:
+            screen_width = self.floating_toggle.winfo_screenwidth()
+            screen_height = self.floating_toggle.winfo_screenheight()
+            x = max(0, min(int(x), max(0, screen_width - size)))
+            y = max(0, min(int(y), max(0, screen_height - size)))
+        except tk.TclError:
+            pass
+        return x, y
+
+    def _configured_floating_position(self, size: int | None = None) -> tuple[int, int] | None:
+        value = self.config_data.get("floating_position", "")
+        if not isinstance(value, str):
+            return None
+        match = re.fullmatch(r"\s*(-?\d+)\s*,\s*(-?\d+)\s*", value)
+        if not match:
+            return None
+        return self._clamp_floating_position(int(match.group(1)), int(match.group(2)), size)
+
+    def _position_floating_toggle(self):
+        if self.floating_toggle is None:
+            return
+        try:
+            size = self._floating_button_size()
+            configured = self._configured_floating_position(size)
+            if configured is not None:
+                x, y = configured
+            else:
+                screen_width = self.floating_toggle.winfo_screenwidth()
+                screen_height = self.floating_toggle.winfo_screenheight()
+                x = max(12, screen_width - size - 28)
+                y = max(12, screen_height - size - 96)
+            self.floating_toggle.geometry(f"{size}x{size}+{x}+{y}")
+        except tk.TclError:
+            pass
+
+    def _refresh_floating_toggle(self):
+        if self.floating_canvas is None:
+            return
+        try:
+            canvas = self.floating_canvas
+            size = self._floating_button_size()
+            canvas.configure(width=size, height=size)
+            if self.floating_toggle is not None:
+                x, y = self._clamp_floating_position(
+                    self.floating_toggle.winfo_x(),
+                    self.floating_toggle.winfo_y(),
+                    size,
+                )
+                self.floating_toggle.geometry(f"{size}x{size}+{x}+{y}")
+            canvas.delete("all")
+            fill = self._floating_active_color() if self.direct_mode_enabled else "#fbfdff"
+            outline = BLUE if self.direct_mode_enabled else FLOAT_INACTIVE_BORDER
+            stipple = "" if self.direct_mode_enabled else "gray12"
+            pad = max(2, int(round(size * 0.06)))
+            border_width = max(2, int(round(size * 0.04)))
+            canvas.create_oval(
+                pad,
+                pad,
+                size - pad,
+                size - pad,
+                fill=fill,
+                outline=outline,
+                width=border_width,
+                stipple=stipple,
+                tags=("hit",),
+            )
+            self._draw_floating_feather(canvas, size)
+            if self.direct_mode_enabled:
+                ring_pad = max(5, int(round(size * 0.11)))
+                canvas.create_oval(
+                    ring_pad,
+                    ring_pad,
+                    size - ring_pad,
+                    size - ring_pad,
+                    outline="#79cfff",
+                    width=max(1, int(round(size * 0.03))),
+                )
+            canvas.update_idletasks()
+        except tk.TclError:
+            pass
+
+    def _draw_floating_feather(self, canvas: tk.Canvas, size: int):
+        def xy(x_ratio: float, y_ratio: float) -> tuple[int, int]:
+            return int(round(size * x_ratio)), int(round(size * y_ratio))
+
+        blade_outline = [
+            *xy(0.66, 0.14),
+            *xy(0.58, 0.20),
+            *xy(0.51, 0.33),
+            *xy(0.44, 0.50),
+            *xy(0.36, 0.70),
+            *xy(0.28, 0.86),
+            *xy(0.39, 0.75),
+            *xy(0.50, 0.58),
+            *xy(0.59, 0.39),
+            *xy(0.70, 0.20),
+        ]
+        blade_inner = [
+            *xy(0.64, 0.17),
+            *xy(0.57, 0.24),
+            *xy(0.50, 0.39),
+            *xy(0.43, 0.57),
+            *xy(0.34, 0.78),
+            *xy(0.44, 0.67),
+            *xy(0.55, 0.49),
+            *xy(0.65, 0.29),
+        ]
+        vein_start = xy(0.32, 0.84)
+        vein_end = xy(0.65, 0.18)
+        light_start = xy(0.39, 0.74)
+        light_end = xy(0.60, 0.27)
+        shadow_start = xy(0.32, 0.90)
+        shadow_end = xy(0.51, 0.86)
+
+        canvas.create_line(
+            shadow_start,
+            shadow_end,
+            fill="#c9c9c9",
+            width=max(1, int(round(size * 0.05))),
+            capstyle="round",
+        )
+        canvas.create_polygon(
+            blade_outline,
+            fill="#0f5f9e",
+            outline="#0a3e6c",
+            width=max(1, int(round(size * 0.025))),
+            smooth=True,
+        )
+        canvas.create_polygon(
+            blade_inner,
+            fill="#1f8bd6",
+            outline="",
+            smooth=True,
+        )
+        canvas.create_line(
+            vein_start,
+            vein_end,
+            fill="#063f72",
+            width=max(1, int(round(size * 0.045))),
+            capstyle="round",
+        )
+        canvas.create_line(
+            light_start,
+            light_end,
+            fill="#d8f4ff",
+            width=max(1, int(round(size * 0.025))),
+            capstyle="round",
+        )
+
+    def _hide_floating_toggle(self):
+        if self.floating_toggle is None:
+            return
+        try:
+            if self.floating_toggle.winfo_exists():
+                self.floating_toggle.withdraw()
+        except tk.TclError:
+            self.floating_toggle = None
+            self.floating_canvas = None
+
+    def _floating_button_press(self, event):
+        if self.floating_toggle is None:
+            return
+        try:
+            self.floating_toggle.lift()
+            self.floating_drag = {
+                "start_x": int(event.x_root),
+                "start_y": int(event.y_root),
+                "window_x": int(self.floating_toggle.winfo_x()),
+                "window_y": int(self.floating_toggle.winfo_y()),
+                "last_x": int(self.floating_toggle.winfo_x()),
+                "last_y": int(self.floating_toggle.winfo_y()),
+                "moved": False,
+            }
+        except tk.TclError:
+            self.floating_drag = None
+
+    def _floating_button_drag(self, event):
+        if self.floating_toggle is None or not self.floating_drag:
+            return
+        try:
+            dx = int(event.x_root) - int(self.floating_drag["start_x"])
+            dy = int(event.y_root) - int(self.floating_drag["start_y"])
+            if abs(dx) > 3 or abs(dy) > 3:
+                self.floating_drag["moved"] = True
+            x, y = self._clamp_floating_position(
+                int(self.floating_drag["window_x"]) + dx,
+                int(self.floating_drag["window_y"]) + dy,
+            )
+            size = self._floating_button_size()
+            self.floating_toggle.geometry(f"{size}x{size}+{x}+{y}")
+            self.floating_drag["last_x"] = x
+            self.floating_drag["last_y"] = y
+            self.config_data["floating_position"] = f"{x},{y}"
+        except tk.TclError:
+            pass
+
+    def _floating_button_release(self, event):
+        drag = self.floating_drag
+        self.floating_drag = None
+        if not drag:
+            return
+        if not drag.get("moved"):
+            self.toggle_direct_mode()
+            self._refresh_floating_toggle()
+            return
+        if self.floating_toggle is not None:
+            try:
+                x, y = self._clamp_floating_position(
+                    int(drag.get("last_x", self.floating_toggle.winfo_x())),
+                    int(drag.get("last_y", self.floating_toggle.winfo_y())),
+                )
+                self.config_data["floating_position"] = f"{x},{y}"
+            except tk.TclError:
+                pass
 
     def _ui(self, key: str) -> str:
         language = self.config_data.get("ui_language", "zh-CN")
@@ -1980,30 +2406,44 @@ class TranslatorApp(tk.Tk):
             self.after_idle(self._focus_input_text_end)
 
     def toggle_direct_mode(self):
+        if IS_WINDOWS and USER32 is not None and self.keyboard_hook is None:
+            self._install_keyboard_hook()
         if not IS_WINDOWS or USER32 is None or self.keyboard_hook is None:
             self.status_var.set(self._ui("direct_unavailable"))
             return
+        try:
+            minimized = self.state() == "iconic"
+        except tk.TclError:
+            minimized = False
         self.direct_mode_enabled = not self.direct_mode_enabled
         self.direct_phase = "idle"
         self.direct_translation_in_progress = False
         self.ready_to_paste = False
         self.ready_to_send_external = False
         self._refresh_direct_button()
-        if self.direct_mode_enabled:
+        if self.direct_mode_enabled and not minimized:
             self.show_page("translate")
         self.status_var.set(
             self._ui("direct_enabled" if self.direct_mode_enabled else "direct_disabled").format(
                 hotkey=self.direct_hotkey_label
             )
         )
+        self._refresh_floating_toggle()
+        if self.floating_toggle is not None:
+            try:
+                self.floating_toggle.lift()
+            except tk.TclError:
+                pass
 
     def _refresh_direct_button(self):
         if not hasattr(self, "direct_button"):
+            self._refresh_floating_toggle()
             return
         self.direct_button.configure(
             bg="#eaf2ff" if self.direct_mode_enabled else PANEL,
             fg=BLUE if self.direct_mode_enabled else TEXT,
         )
+        self._refresh_floating_toggle()
 
     def _apply_direct_hotkey(self, value: str):
         normalized = normalize_direct_hotkey(value, DEFAULT_CONFIG["direct_hotkey"])
@@ -2312,7 +2752,39 @@ class TranslatorApp(tk.Tk):
         self.direct_hotkey_var = tk.StringVar(value=self.config_data.get("direct_hotkey", DEFAULT_CONFIG["direct_hotkey"]))
         self._labeled_entry(direct_panel, 1, self._ui("direct_hotkey_setting"), self.direct_hotkey_var, DEFAULT_CONFIG["direct_hotkey"])
         ttk.Label(direct_panel, text=self._ui("direct_hotkey_help"), style="Muted.TLabel").grid(
-            row=2, column=1, sticky="w", padx=12, pady=(0, 18)
+            row=2, column=1, sticky="w", padx=12, pady=(0, 10)
+        )
+        self.floating_button_size_var = tk.IntVar(value=self.config_data.get("floating_button_size", DEFAULT_CONFIG["floating_button_size"]))
+        self._floating_button_size_control(
+            direct_panel,
+            3,
+            self._ui("floating_button_size"),
+            self.floating_button_size_var,
+        )
+        ttk.Label(direct_panel, text=self._ui("floating_button_size_help"), style="Muted.TLabel").grid(
+            row=4, column=1, sticky="w", padx=12, pady=(0, 10)
+        )
+        preset_key = self.config_data.get("floating_active_color_preset", DEFAULT_CONFIG["floating_active_color_preset"])
+        self.floating_color_preset_var = tk.StringVar(value=self._color_preset_label(preset_key))
+        self.floating_color_preset_combo = self._labeled_combo(
+            direct_panel,
+            5,
+            self._ui("floating_button_color_preset"),
+            self.floating_color_preset_var,
+            self._color_preset_options(),
+        )
+        self.floating_color_preset_combo.bind("<<ComboboxSelected>>", lambda _event: self._apply_floating_color_preview())
+        self.floating_custom_color_var = tk.StringVar(value=self.config_data.get("floating_active_color", DEFAULT_CONFIG["floating_active_color"]))
+        custom_entry = self._labeled_entry(
+            direct_panel,
+            6,
+            self._ui("floating_button_custom_color"),
+            self.floating_custom_color_var,
+            DEFAULT_CONFIG["floating_active_color"],
+        )
+        custom_entry.bind("<KeyRelease>", lambda _event: self._apply_floating_color_preview(validate=False))
+        ttk.Label(direct_panel, text=self._ui("floating_button_color_help"), style="Muted.TLabel").grid(
+            row=7, column=1, sticky="w", padx=12, pady=(0, 18)
         )
 
         actions = ttk.Frame(content, style="App.TFrame")
@@ -2423,6 +2895,73 @@ class TranslatorApp(tk.Tk):
         )
         spinbox.grid(row=row, column=2, sticky="w", padx=(0, 18), pady=8)
         spinbox.bind("<KeyRelease>", lambda _event: self._apply_text_fonts())
+
+    def _floating_button_size_control(self, parent, row: int, label: str, variable: tk.IntVar):
+        ttk.Label(parent, text=label, style="Label.TLabel").grid(row=row, column=0, sticky="w", padx=18, pady=8)
+        scale = tk.Scale(
+            parent,
+            variable=variable,
+            from_=36,
+            to=120,
+            orient="horizontal",
+            showvalue=False,
+            resolution=1,
+            bg=PANEL,
+            highlightthickness=0,
+            command=lambda _value: self._apply_floating_button_size(),
+        )
+        scale.grid(row=row, column=1, sticky="ew", padx=12, pady=8)
+        spinbox = tk.Spinbox(
+            parent,
+            from_=36,
+            to=120,
+            width=5,
+            textvariable=variable,
+            command=self._apply_floating_button_size,
+            font=self._font_name("body"),
+        )
+        spinbox.grid(row=row, column=2, sticky="w", padx=(0, 18), pady=8)
+        spinbox.bind("<KeyRelease>", lambda _event: self._apply_floating_button_size())
+
+    def _safe_floating_button_size(self) -> int:
+        variable = getattr(self, "floating_button_size_var", None)
+        value = variable.get() if variable is not None else self.config_data.get("floating_button_size")
+        return normalize_floating_button_size(value, DEFAULT_CONFIG["floating_button_size"])
+
+    def _apply_floating_button_size(self):
+        size = self._safe_floating_button_size()
+        self.config_data["floating_button_size"] = size
+        if hasattr(self, "floating_button_size_var"):
+            try:
+                if int(self.floating_button_size_var.get()) != size:
+                    self.floating_button_size_var.set(size)
+            except (tk.TclError, ValueError):
+                self.floating_button_size_var.set(size)
+        if self.floating_toggle is not None:
+            self._refresh_floating_toggle()
+
+    def _selected_floating_color_preset(self) -> str:
+        if not hasattr(self, "floating_color_preset_var"):
+            return self.config_data.get("floating_active_color_preset", DEFAULT_CONFIG["floating_active_color_preset"])
+        return self._color_preset_key_from_label(self.floating_color_preset_var.get())
+
+    def _apply_floating_color_preview(self, validate: bool = False) -> bool:
+        preset = self._selected_floating_color_preset()
+        if preset == "custom":
+            raw_color = self.floating_custom_color_var.get() if hasattr(self, "floating_custom_color_var") else ""
+            if validate and not is_hex_color(raw_color):
+                messagebox.showerror(self._ui("settings_error"), self._ui("floating_button_color_invalid"))
+                return False
+            color = normalize_hex_color(raw_color, self.config_data.get("floating_active_color", DEFAULT_CONFIG["floating_active_color"]))
+        else:
+            color = FLOAT_COLOR_PRESETS[preset][0]
+            if hasattr(self, "floating_custom_color_var"):
+                self.floating_custom_color_var.set(color)
+
+        self.config_data["floating_active_color_preset"] = preset
+        self.config_data["floating_active_color"] = color
+        self._refresh_floating_toggle()
+        return True
 
     def _safe_font_size(self, variable: tk.IntVar, fallback: int) -> int:
         try:
@@ -2550,12 +3089,35 @@ class TranslatorApp(tk.Tk):
         try:
             if int(vk_code) != int(self.direct_hotkey_vk):
                 return False
+            return self._direct_hotkey_state_pressed()
+        except Exception:
+            return False
+
+    def _direct_hotkey_state_pressed(self) -> bool:
+        if not IS_WINDOWS or USER32 is None:
+            return False
+        try:
+            if not (USER32.GetAsyncKeyState(int(self.direct_hotkey_vk)) & 0x8000):
+                return False
             return all(
                 USER32.GetAsyncKeyState(HOTKEY_MODIFIER_VKS[modifier]) & 0x8000
                 for modifier in self.direct_hotkey_modifiers
             )
         except Exception:
             return False
+
+    def _poll_direct_hotkey_state(self):
+        try:
+            pressed = self._direct_hotkey_state_pressed()
+            if pressed and not self.direct_hotkey_poll_pressed:
+                now = time.monotonic()
+                if now - self.direct_last_toggle_at >= 0.6 and not self.direct_toggle_pending:
+                    self.direct_last_toggle_at = now
+                    self.toggle_direct_mode()
+            self.direct_hotkey_poll_pressed = pressed
+        except Exception:
+            self.direct_hotkey_poll_pressed = False
+        self.after(80, self._poll_direct_hotkey_state)
 
     def _poll_direct_events(self):
         try:
@@ -3013,6 +3575,19 @@ class TranslatorApp(tk.Tk):
         input_font_size = self._safe_font_size(self.input_font_size_var, self.config_data.get("input_font_size", 13))
         output_font_size = self._safe_font_size(self.output_font_size_var, self.config_data.get("output_font_size", 13))
         back_font_size = self._safe_font_size(self.back_font_size_var, self.config_data.get("back_font_size", 11))
+        floating_button_size = self._safe_floating_button_size()
+        floating_color_preset = self._selected_floating_color_preset()
+        floating_color_raw = self.floating_custom_color_var.get() if hasattr(self, "floating_custom_color_var") else DEFAULT_CONFIG["floating_active_color"]
+        if floating_color_preset == "custom":
+            if not is_hex_color(floating_color_raw):
+                if validate:
+                    messagebox.showerror(self._ui("settings_error"), self._ui("floating_button_color_invalid"))
+                    return False
+                floating_color = self.config_data.get("floating_active_color", DEFAULT_CONFIG["floating_active_color"])
+            else:
+                floating_color = normalize_hex_color(floating_color_raw, DEFAULT_CONFIG["floating_active_color"])
+        else:
+            floating_color = FLOAT_COLOR_PRESETS[floating_color_preset][0]
         raw_direct_hotkey = self.direct_hotkey_var.get().strip() if hasattr(self, "direct_hotkey_var") else DEFAULT_CONFIG["direct_hotkey"]
         parsed_direct_hotkey = parse_direct_hotkey(raw_direct_hotkey)
         if not parsed_direct_hotkey:
@@ -3046,9 +3621,14 @@ class TranslatorApp(tk.Tk):
                 "output_font_size": output_font_size,
                 "back_font_size": back_font_size,
                 "direct_hotkey": direct_hotkey,
+                "floating_button_size": floating_button_size,
+                "floating_active_color_preset": floating_color_preset,
+                "floating_active_color": floating_color,
             }
         )
         self._apply_direct_hotkey(direct_hotkey)
+        self._apply_floating_button_size()
+        self._apply_floating_color_preview(validate=False)
 
         if self.config_data.get("source_lang") not in self.config_data["my_languages"]:
             self.config_data["source_lang"] = self.config_data["my_languages"][0]
@@ -3457,6 +4037,11 @@ class TranslatorApp(tk.Tk):
             save_config(self.config_data)
         finally:
             self._uninstall_keyboard_hook()
+            if self.floating_toggle is not None:
+                try:
+                    self.floating_toggle.destroy()
+                except tk.TclError:
+                    pass
             self.destroy()
 
 
