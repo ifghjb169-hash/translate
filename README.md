@@ -14,7 +14,7 @@ py -3 translator_app.py
 
 当前发布版本：`v2.3.0`
 
-- 组织仓库 Release：https://github.com/secure-artifacts/translate/releases/tag/v2.3.0
+- 
 - 个人仓库 Release：https://github.com/ifghjb169-hash/translate/releases/tag/v2.3.0
 - 构建产物：`AI-Translate-Assistant-v2.3.0-win-x64.zip`
 - 可执行文件：解压后运行 `AI-Translate-Assistant.exe`
